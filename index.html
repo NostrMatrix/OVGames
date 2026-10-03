@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<meta name="description" content="OVGames — a collection of small browser games and tools.">
+<title>OVGames</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23181a22'/%3E%3Ctext x='16' y='22' font-size='15' font-weight='800' font-family='Arial' text-anchor='middle' fill='%237c9cff'%3EOV%3C/text%3E%3C/svg%3E">
+<style>
+  /* =====================================================================
+     OVGames – valikkosivu. Pelit avataan suoraan omina sivuinaan.
+     Uusi peli: lisää rivi GAMES-listaan (ks. skriptin alku).
+     ===================================================================== */
+  :root {
+    --bg: #0b0c10;
+    --bg-2: #111319;
+    --card: #15171f;
+    --card-hover: #1b1e28;
+    --line: #242733;
+    --line-2: #323646;
+    --text: #eceef4;
+    --text-2: #9aa0b2;
+    --text-3: #676d80;
+    --accent: #7c9cff;
+    --accent-2: #b48cff;
+    --radius: 18px;
+    --gutter: 16px;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(124, 156, 255, .13), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(180, 140, 255, .09), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 10px; }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: max(20px, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
+             max(40px, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+  }
+  @media (min-width: 700px) { :root { --gutter: 32px; } .wrap { padding-top: 36px; } }
+
+  /* ---------- yläpalkki ---------- */
+  .top { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .logo {
+    display: inline-flex; align-items: center; gap: 11px;
+    font-weight: 800; font-size: 19px; letter-spacing: -.01em;
+  }
+  .logo-mark {
+    width: 36px; height: 36px; border-radius: 11px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0b0c10; font-size: 13px; font-weight: 900; letter-spacing: -.02em;
+    box-shadow: 0 6px 24px -8px rgba(124, 156, 255, .8);
+  }
+  .logo span b { font-weight: 800; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* ---------- otsikkoalue ---------- */
+  .crumbs {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin: 0 0 6px; font-size: 13px; color: var(--text-3);
+  }
+  .crumbs a { color: var(--text-2); padding: 6px 0; }
+  .crumbs a:hover { color: var(--text); }
+  .back {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin: 0 0 14px; padding: 9px 14px 9px 10px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--bg-2); color: var(--text-2); font-size: 14px; font-weight: 500;
+    transition: color .15s, border-color .15s, background-color .15s;
+  }
+  .back:hover { color: var(--text); border-color: var(--line-2); background: var(--card); }
+  .back svg { width: 18px; height: 18px; }
+  h1 { margin: 0; font-size: clamp(26px, 6vw, 38px); line-height: 1.15; letter-spacing: -.025em; font-weight: 750; }
+  .lead { margin: 8px 0 26px; color: var(--text-2); max-width: 60ch; }
+
+  /* ---------- kortit ---------- */
+  .grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } }
+  @media (min-width: 900px) { .grid.games { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+  .card {
+    --c: var(--accent);
+    position: relative;
+    display: flex; align-items: center; gap: 16px;
+    min-height: 88px; padding: 16px 18px;
+    border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--card);
+    overflow: hidden;
+    transition: transform .18s ease, border-color .18s, background-color .18s, box-shadow .18s;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(420px 160px at 0% 0%, color-mix(in srgb, var(--c) 14%, transparent), transparent 70%);
+    opacity: .7; transition: opacity .18s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--c) 45%, var(--line));
+    background: var(--card-hover);
+    box-shadow: 0 14px 34px -18px color-mix(in srgb, var(--c) 70%, transparent);
+  }
+  .card:hover::before { opacity: 1; }
+  .card:active { transform: translateY(0) scale(.99); }
+
+  .icon {
+    position: relative; flex: none;
+    width: 56px; height: 56px; border-radius: 16px;
+    display: grid; place-items: center;
+    font-size: 28px; line-height: 1;
+    background: color-mix(in srgb, var(--c) 16%, var(--bg-2));
+    border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  }
+  .body { position: relative; min-width: 0; flex: 1; }
+  .title { display: block; font-size: 16.5px; font-weight: 650; letter-spacing: -.01em; }
+  .desc { display: block; margin-top: 2px; font-size: 13.5px; color: var(--text-2); }
+  .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 550; color: var(--text-2);
+    background: rgba(255, 255, 255, .045); border: 1px solid var(--line);
+  }
+  .chip svg { width: 13px; height: 13px; }
+  .chip.warn { color: #ffcf7a; border-color: rgba(255, 207, 122, .3); background: rgba(255, 207, 122, .07); }
+  .arrow { position: relative; flex: none; width: 20px; height: 20px; color: var(--text-3); transition: transform .18s, color .18s; }
+  .card:hover .arrow { color: var(--text); transform: translateX(3px); }
+
+  /* kategoriakortit hieman isommat */
+  .grid.cats .card { min-height: 112px; padding: 20px; }
+  .grid.cats .icon { width: 64px; height: 64px; font-size: 32px; border-radius: 18px; }
+  .grid.cats .title { font-size: 18px; }
+
+  .empty { padding: 40px 0; color: var(--text-3); }
+
+  footer { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--text-3); }
+
+  .view { animation: in .22s ease-out; }
+  @keyframes in { from { opacity: 0; transform: translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="logo" href="#/" aria-label="OVGames home">
+      <span class="logo-mark" aria-hidden="true">OV</span>
+      <span><b>OV</b>Games</span>
+    </a>
+  </header>
+
+  <main id="app" aria-live="polite"></main>
+
+  <footer>Small browser games and tools · <span id="count"></span></footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* =====================================================================
+     PELILISTA – uusi peli lisätään tähän yhdellä rivillä.
+       category = kategorian tunnus (ks. CATEGORIES); tuntematon tunnus luo uuden kategorian
+       path     = polku pelin aloitussivuun tämän tiedoston sijainnista
+       devices  = 'desktop', 'phone' tai molemmat
+       color    = kortin korostusväri (valinnainen)
+     ===================================================================== */
+  const GAMES = [
+    { category: 'desktop-games', title: 'Copper Mountain', icon: '⛰️', color: '#d58b4c',
+      path: 'desktop-games/vaskivuori/index.html',
+      desc: 'Roguelike adventure – descend ten floors and win back the Sampo.', devices: ['desktop'] },
+    { category: 'desktop-games', title: 'Saylor Snake', icon: '🐍', color: '#f7931a',
+      path: 'desktop-games/saylorsnake/index.html',
+      desc: 'Classic snake with a satirical Bitcoin twist.', devices: ['desktop'] },
+
+    { category: 'phone-games', title: 'Orbit', icon: '🪐', color: '#7ad7ff',
+      path: 'phone-games/orbit/index.html',
+      desc: 'Fit pieces onto rotating rings and clear lines.', devices: ['phone', 'desktop'] },
+    { category: 'phone-games', title: 'Block Workshop', icon: '🧱', color: '#c89a52',
+      path: 'phone-games/palikkapaja/palikkapaja.html',
+      desc: 'Drag wooden blocks onto the grid and fill rows and columns.', devices: ['phone', 'desktop'] },
+    { category: 'phone-games', title: 'Drop', icon: '🧊', color: '#4f8dff',
+      path: 'phone-games/pudotus/index.html',
+      desc: 'Drop cubes and match three of a color before the stack overflows.', devices: ['phone', 'desktop'] },
+
+    { category: 'other', title: 'Beat Meter', icon: '🎵', color: '#ffb020',
+      path: 'other/metronomi/index.html',
+      desc: 'Metronome with tap tempo and many time signatures.', devices: ['phone', 'desktop'] },
+    { category: 'other', title: 'Key Hunt', icon: '🔑', color: '#ff7a00',
+      path: 'other/avainjahti/index.html',
+      desc: 'Visualizes just how enormous the Bitcoin key space is.', devices: ['desktop', 'phone'] },
+  ];
+
+  // Kategorioiden nimet, kuvaukset ja järjestys. Listaamaton kategoria näytetään lopussa tunnuksen pohjalta.
+  const CATEGORIES = [
+    { id: 'desktop-games', title: 'Desktop Games', icon: '🖥️', color: '#7c9cff', desc: 'Best played with a keyboard and a bigger screen.' },
+    { id: 'phone-games',   title: 'Phone Games',   icon: '📱', color: '#5ee0a8', desc: 'Made for touch screens – play anywhere.' },
+    { id: 'other',         title: 'Other',         icon: '🧰', color: '#b48cff', desc: 'Handy little tools and experiments.' },
+  ];
+
+  /* ===================================================================== */
+
+  const ICONS = {
+    desktop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
+    phone:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>',
+    arrow:   '<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
+    back:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
+  };
+  const DEVICE_LABEL = { desktop: 'Desktop', phone: 'Phone' };
+
+  const app = document.getElementById('app');
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const titleCase = id => id.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  // Kategoriat: määritellyt ensin, sitten pelilistasta löytyvät muut.
+  function categories() {
+    const list = CATEGORIES.map(c => ({ ...c }));
+    for (const g of GAMES) {
+      if (!list.some(c => c.id === g.category)) {
+        list.push({ id: g.category, title: titleCase(g.category), icon: '🎮', color: '#7c9cff', desc: '' });
+      }
+    }
+    return list
+      .map(c => ({ ...c, games: GAMES.filter(g => g.category === c.id) }))
+      .filter(c => c.games.length);
+  }
+
+  function categoryCard(c) {
+    const n = c.games.length;
+    return `<a class="card" href="#/${encodeURIComponent(c.id)}" style="--c:${esc(c.color)}">
+      <span class="icon" aria-hidden="true">${esc(c.icon)}</span>
+      <span class="body">
+        <span class="title">${esc(c.title)}</span>
+        ${c.desc ? `<span class="desc">${esc(c.desc)}</span>` : ''}
+        <span class="meta"><span class="chip">${n} ${n === 1 ? 'item' : 'items'}</span></span>
+      </span>
+      ${ICONS.arrow}
+    </a>`;
+  }
+
+  function gameCard(g) {
+    const devices = g.devices && g.devices.length ? g.devices : ['desktop', 'phone'];
+    let chips = devices.map(d => `<span class="chip">${ICONS[d] || ''}${esc(DEVICE_LABEL[d] || d)}</span>`).join('');
+    if (touch && !devices.includes('phone')) chips += '<span class="chip warn">Best on a computer</span>';
+    return `<a class="card" href="${encodeURI(g.path)}" style="--c:${esc(g.color || '#7c9cff')}">
+      <span class="icon" aria-hidden="true">${esc(g.icon || '🎮')}</span>
+      <span class="body">
+        <span class="title">${esc(g.title)}</span>
+        ${g.desc ? `<span class="desc">${esc(g.desc)}</span>` : ''}
+        <span class="meta">${chips}</span>
+      </span>
+      ${ICONS.arrow}
+    </a>`;
+  }
+
+  function renderHome(cats) {
+    document.title = 'OVGames';
+    app.innerHTML = `<section class="view">
+      <h1>Pick a category</h1>
+      <p class="lead">A growing collection of small browser games and tools. Everything runs right in your browser – no installs.</p>
+      <div class="grid cats">${cats.map(categoryCard).join('')}</div>
+    </section>`;
+  }
+
+  function renderCategory(c) {
+    document.title = `${c.title} · OVGames`;
+    app.innerHTML = `<section class="view">
+      <a class="back" href="#/">${ICONS.back}All categories</a>
+      <h1>${esc(c.icon)} ${esc(c.title)}</h1>
+      ${c.desc ? `<p class="lead">${esc(c.desc)}</p>` : '<div style="height:22px"></div>'}
+      <div class="grid games">${c.games.map(gameCard).join('')}</div>
+    </section>`;
+  }
+
+  // Reititys osoitteen #-osan perusteella, jotta selaimen takaisin-painike toimii myös valikossa.
+  function route() {
+    const cats = categories();
+    const id = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+    const cat = cats.find(c => c.id === id);
+    if (cat) renderCategory(cat);
+    else renderHome(cats);
+    window.scrollTo(0, 0);
+  }
+
+  document.getElementById('count').textContent = `${GAMES.length} games & tools`;
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Orbit</title>
+<style>
+  :root {
+    --bg: #05060f;
+    --panel: rgba(20, 26, 54, .72);
+    --text: #e6ebff;
+    --muted: #8b93b8;
+    --accent: #7ad7ff;
+    --gold: #ffd36b;
+    --danger: #ff6b81;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; overflow: hidden; color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: radial-gradient(ellipse at 50% 40%, #16193a 0%, #070816 60%, #03040a 100%);
+    display: flex; flex-direction: column;
+  }
+  #stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  #top {
+    position: relative; z-index: 2; display: flex; gap: 8px; justify-content: center;
+    flex-wrap: wrap; padding: 8px 10px 4px;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid rgba(122, 215, 255, .15);
+    border-radius: 12px; padding: 4px 12px; min-width: 72px; text-align: center;
+  }
+  .stat .l { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .stat .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #comboV.hot { color: var(--gold); text-shadow: 0 0 10px rgba(255, 211, 107, .6); }
+  #spinsV { letter-spacing: 2px; color: var(--accent); }
+  .stat .bar { height: 3px; margin-top: 2px; background: rgba(122, 215, 255, .15); border-radius: 2px; overflow: hidden; }
+  .stat .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  #info .ccw { color: var(--gold); font-weight: 600; }
+  #muteBtn { min-width: 46px; padding: 4px 10px; font-size: 20px; cursor: pointer; }
+  #muteBtn.off { opacity: .55; }
+  #info {
+    position: relative; z-index: 2; text-align: center; font-size: 13px; color: var(--muted);
+    min-height: 22px; padding: 2px 10px;
+  }
+  #info b { color: var(--accent); }
+  #info .hint { color: var(--gold); font-weight: 700; animation: pulse 1s ease-in-out infinite alternate; }
+  @keyframes pulse { from { opacity: .6; } to { opacity: 1; } }
+  #main {
+    position: relative; z-index: 1; flex: 1; display: flex; align-items: center;
+    justify-content: center; gap: 12px; min-height: 0; padding: 6px;
+  }
+  #main.port { flex-direction: column; }
+  #main.land { flex-direction: row; }
+  #boardWrap { position: relative; }
+  canvas { display: block; touch-action: none; }
+  #overlay { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+
+  #spinPanel {
+    position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
+    display: none; gap: 8px; align-items: center; background: var(--panel);
+    border: 1px solid rgba(122, 215, 255, .35); border-radius: 14px; padding: 6px 10px;
+    box-shadow: 0 0 20px rgba(122, 215, 255, .25); white-space: nowrap;
+  }
+  #spinPanel.show { display: flex; }
+  #spinPanel span { font-size: 13px; color: var(--muted); margin-right: 4px; }
+  button {
+    font: inherit; color: var(--text); background: rgba(122, 215, 255, .12);
+    border: 1px solid rgba(122, 215, 255, .4); border-radius: 10px; padding: 6px 12px;
+    cursor: pointer; touch-action: manipulation;
+  }
+  button:hover { background: rgba(122, 215, 255, .25); }
+  #spinPanel button { font-size: 20px; line-height: 1; padding: 6px 12px; }
+
+  #gameover {
+    position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+    background: rgba(3, 4, 12, .72); backdrop-filter: blur(4px);
+  }
+  #gameover.show { display: flex; }
+  .card {
+    background: linear-gradient(160deg, #1a2050, #0c0f26); border: 1px solid rgba(122, 215, 255, .3);
+    border-radius: 20px; padding: 28px 36px; text-align: center; min-width: 260px;
+    box-shadow: 0 0 40px rgba(122, 215, 255, .2);
+  }
+  .card h2 { font-size: 28px; letter-spacing: .1em; margin-bottom: 14px; }
+  .card .big { font-size: 44px; font-weight: 800; color: var(--gold); }
+  .card p { color: var(--muted); margin: 6px 0 18px; }
+  .card .rec { color: var(--gold); font-weight: 700; }
+  .card button { font-size: 18px; padding: 10px 26px; }
+
+  #debugPanel {
+    position: fixed; left: 8px; top: 64px; z-index: 8; display: none; width: 176px;
+    max-height: calc(100% - 80px); overflow-y: auto; background: rgba(10, 12, 30, .92);
+    border: 1px solid rgba(255, 211, 107, .5); border-radius: 12px; padding: 8px;
+  }
+  #debugPanel.show { display: block; }
+  #debugPanel h4 { font-size: 12px; color: var(--gold); margin-bottom: 6px; }
+  #debugPanel .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  #debugPanel canvas { background: rgba(255, 255, 255, .05); border-radius: 6px; cursor: pointer; width: 50px; height: 50px; }
+  #debugPanel canvas:hover { background: rgba(255, 211, 107, .2); }
+  #debugPanel .row { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  #debugPanel .row button { font-size: 11px; padding: 4px 6px; }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<div id="top">
+  <div class="stat"><div class="l">Score</div><div class="v" id="scoreV">0</div></div>
+  <div class="stat"><div class="l">Best</div><div class="v" id="bestV">0</div></div>
+  <div class="stat"><div class="l">Combo</div><div class="v" id="comboV">x1</div></div>
+  <div class="stat"><div class="l">Spins</div><div class="v" id="spinsV">●○○</div></div>
+  <div class="stat"><div class="l">Level</div><div class="v" id="levelV">1</div><div class="bar"><i id="levelBar"></i></div></div>
+  <button class="stat" id="muteBtn" title="Mute (M)" aria-label="Mute">🔊</button>
+</div>
+<div id="info"></div>
+
+<div id="main" class="port">
+  <div id="boardWrap">
+    <canvas id="board"></canvas>
+    <div id="spinPanel">
+      <span id="spinLabel">Ring 1</span>
+      <button id="spinCCW" title="Counter-clockwise">⟲</button>
+      <button id="spinCW" title="Clockwise">⟳</button>
+      <button id="spinCancel" title="Cancel">✕</button>
+    </div>
+  </div>
+  <canvas id="tray"></canvas>
+</div>
+
+<canvas id="overlay"></canvas>
+
+<div id="gameover">
+  <div class="card">
+    <h2>GAME OVER</h2>
+    <div class="big" id="goScore">0</div>
+    <p id="goBest">Best 0</p>
+    <button id="newGame">New game</button>
+  </div>
+</div>
+
+<div id="debugPanel">
+  <h4>DEBUG – click a piece → tray</h4>
+  <div class="grid" id="debugPieces"></div>
+  <div class="row">
+    <button id="dbgClear">Clear board</button>
+    <button id="dbgSpin">+1 spin</button>
+    <button id="dbgLevel">Level +1</button>
+    <button id="dbgRock">Asteroid</button>
+    <button id="dbgDir">Flip dir</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   KONFIGURAATIO
+   ===================================================================== */
+const RINGS = 5;            // renkaiden määrä (0 = sisin)
+const SECTORS = 12;         // sektoreiden määrä
+const CORE_RATIO = 0.2;     // tyhjän ytimen säde suhteessa laudan säteeseen
+const STEP = Math.PI * 2 / SECTORS;
+
+const COMBO_STEPS = [1, 1.5, 2, 3];
+const RING_POINTS = 60;
+const RAY_POINTS = 25;
+const EXTRA_LINE_BONUS = 0.5;
+const START_SPINS = 1;
+const MAX_SPINS = 3;
+const TRAY_SIZE = 3;
+
+const ROTATE_MS = 250;
+const CLEAR_MS = 300;
+const BEST_KEY = 'orbit.best';
+
+const COLORS = ['#ff5d73', '#ffa43f', '#ffe45c', '#5ef08f', '#3fd9ff', '#6c8cff', '#b46cff', '#ff6fd8'];
+
+// Palikat: offsetit (dRing, dSector) ankkurisolusta. Ei kääntöä.
+const PIECES = [
+  { id: 'single', cells: [[0, 0]] },
+  { id: 'arc2',   cells: [[0, 0], [0, 1]] },
+  { id: 'rad2',   cells: [[0, 0], [1, 0]] },
+  { id: 'arc3',   cells: [[0, 0], [0, 1], [0, 2]] },
+  { id: 'rad3',   cells: [[0, 0], [1, 0], [2, 0]] },
+  { id: 'sq',     cells: [[0, 0], [0, 1], [1, 0], [1, 1]] },
+  { id: 'L1',     cells: [[0, 0], [1, 0], [2, 0], [0, 1]] },
+  { id: 'L2',     cells: [[0, 0], [1, 0], [2, 0], [2, 1]] },
+  { id: 'L3',     cells: [[0, 1], [1, 1], [2, 1], [0, 0]] },
+  { id: 'L4',     cells: [[0, 1], [1, 1], [2, 1], [2, 0]] },
+  { id: 'Tarc',   cells: [[0, 0], [0, 1], [0, 2], [1, 1]] },
+  { id: 'Trad',   cells: [[0, 0], [1, 0], [2, 0], [1, 1]] },
+  { id: 'arc4',   cells: [[0, 0], [0, 1], [0, 2], [0, 3]] },
+];
+// Painotus koon mukaan: isot harvemmin. Tasolla 2+ painotus siirtyy kohti isoja.
+const WEIGHT_BY_SIZE = { 1: 3, 2: 3.5, 3: 2.6, 4: 1.1 };
+const WEIGHT_SHIFT   = { 1: -0.5, 2: -0.3, 3: 0.2, 4: 0.25 };   // muutos per taso tason 1 jälkeen
+const WEIGHT_LIMITS  = { 1: [1, 3], 2: [2, 3.5], 3: [2.6, 3.4], 4: [1.1, 2.1] };
+
+// Tasot: pisteraja, jolla taso alkaa (taso 1 = indeksi 0)
+const LEVEL_THRESHOLDS = [0, 300, 800, 1500, 2500, 4000, 6000, 8500, 11500];
+const CCW_FROM_LEVEL = 3;        // tästä tasosta lähtien rengas voi pyörähtää vastapäivään
+const ASTEROID_FROM_LEVEL = 4;   // tästä tasosta lähtien asteroideja
+const LEVEL_INFO = {
+  2: 'Bigger pieces incoming',
+  3: 'Rings may now rotate counter-clockwise!',
+  4: 'Asteroids incoming!',
+};
+const ROCK = 100;                // asteroidisolun arvo ruudukossa
+const ROCK_HEX = '#8d93a8';
+
+/* =====================================================================
+   ÄÄNET – syntetisoitu Web Audiolla, ei äänitiedostoja
+   ===================================================================== */
+const MUTE_KEY = 'orbit.muted';
+let muted = (() => { try { return localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { return false; } })();
+let audioCtx = null, masterGain = null, noiseBuf = null;
+
+function audio() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audioCtx = new AC();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.35;
+    masterGain.connect(audioCtx.destination);
+    noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function envelope(g, t, vol, attack, dur) {
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+}
+
+function tone({ freq, to, dur = 0.12, type = 'sine', vol = 0.4, delay = 0, attack = 0.005 }) {
+  const t = audioCtx.currentTime + delay;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  envelope(g, t, vol, attack, dur);
+  o.connect(g).connect(masterGain);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+
+function noise({ dur = 0.2, vol = 0.2, freq = 1500, to, q = 1, delay = 0, attack = 0.01 }) {
+  const t = audioCtx.currentTime + delay;
+  const src = audioCtx.createBufferSource(), f = audioCtx.createBiquadFilter(), g = audioCtx.createGain();
+  src.buffer = noiseBuf;
+  f.type = 'bandpass'; f.Q.value = q;
+  f.frequency.setValueAtTime(freq, t);
+  if (to) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+  envelope(g, t, vol, attack, dur);
+  src.connect(f).connect(g).connect(masterGain);
+  src.start(t); src.stop(t + dur + 0.05);
+}
+
+const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
+const note = (base, step) => base * Math.pow(2, step / 12);
+
+const SOUNDS = {
+  click:   () => tone({ freq: 880, dur: 0.05, type: 'triangle', vol: 0.2 }),
+  pick:    () => tone({ freq: 500, to: 720, dur: 0.08, type: 'triangle', vol: 0.25 }),
+  place:   () => { tone({ freq: 200, to: 90, dur: 0.14, vol: 0.55 }); noise({ dur: 0.05, vol: 0.12, freq: 3200 }); },
+  invalid: () => { tone({ freq: 180, to: 120, dur: 0.16, type: 'square', vol: 0.1 }); tone({ freq: 150, to: 100, dur: 0.16, type: 'square', vol: 0.08, delay: 0.09 }); },
+  rotate:  () => { noise({ dur: 0.26, vol: 0.16, freq: 700, to: 2400, q: 3 }); tone({ freq: 140, to: 210, dur: 0.22, type: 'sine', vol: 0.15 }); },
+  // mult = kombokerroin → nuotit nousevat kombon mukana
+  clear:   (mult = 1) => {
+    const base = 523 * Math.pow(2, (COMBO_STEPS.indexOf(mult) * 2) / 12);
+    [0, 2, 4].forEach((k, i) => tone({ freq: note(base, PENTA[k]), dur: 0.22, type: 'triangle', vol: 0.3, delay: i * 0.06 }));
+    noise({ dur: 0.3, vol: 0.08, freq: 6000, q: 0.7 });
+  },
+  multiclear: (mult = 1) => {
+    const base = 523 * Math.pow(2, (COMBO_STEPS.indexOf(mult) * 2) / 12);
+    [0, 2, 3, 4, 5].forEach((k, i) => tone({ freq: note(base, PENTA[k]), dur: 0.3, type: 'triangle', vol: 0.3, delay: i * 0.055 }));
+    tone({ freq: base / 2, dur: 0.45, type: 'sine', vol: 0.3 });
+    noise({ dur: 0.45, vol: 0.1, freq: 5000, q: 0.7 });
+  },
+  spinGain: () => [0, 4, 7, 12].forEach((s, i) => tone({ freq: note(1047, s), dur: 0.12, type: 'sine', vol: 0.18, delay: 0.25 + i * 0.05 })),
+  levelUp:  () => [0, 4, 7, 12, 16].forEach((s, i) => tone({ freq: note(523, s), dur: 0.18, type: 'square', vol: 0.12, delay: i * 0.07 })),
+  asteroid: () => { tone({ freq: 1800, to: 300, dur: 0.5, type: 'sine', vol: 0.12 }); noise({ dur: 0.5, vol: 0.1, freq: 3000, to: 600, q: 2 }); },
+  impact:   () => { tone({ freq: 110, to: 40, dur: 0.35, vol: 0.7 }); noise({ dur: 0.3, vol: 0.3, freq: 500, q: 0.8 }); },
+  gameover: () => [0, -3, -7, -12].forEach((s, i) => tone({ freq: note(392, s), dur: 0.4, type: 'triangle', vol: 0.3, delay: i * 0.18 })),
+};
+
+function playSound(name, arg) {
+  if (muted || !SOUNDS[name]) return;
+  if (!audio()) return;
+  try { SOUNDS[name](arg); } catch (e) { /* ääni ei saa kaataa peliä */ }
+}
+
+function setMuted(m, silent = false) {
+  muted = m;
+  try { localStorage.setItem(MUTE_KEY, m ? '1' : '0'); } catch (e) { /* ei tallennusta */ }
+  const btn = document.getElementById('muteBtn');
+  btn.textContent = m ? '🔇' : '🔊';
+  btn.classList.toggle('off', m);
+  btn.title = m ? 'Unmute (M)' : 'Mute (M)';
+  if (!m && !silent) playSound('click');
+}
+
+/* =====================================================================
+   PELILOGIIKKA – puhtaita funktioita, ei piirtoa
+   ===================================================================== */
+const Logic = {
+  mod(n) { return ((n % SECTORS) + SECTORS) % SECTORS; },
+
+  emptyGrid() { return Array.from({ length: RINGS }, () => Array(SECTORS).fill(-1)); },
+
+  cloneGrid(g) { return g.map(row => row.slice()); },
+
+  canPlace(grid, cells, ar, as) {
+    for (const [dr, ds] of cells) {
+      const r = ar + dr;
+      if (r < 0 || r >= RINGS) return false;
+      if (grid[r][Logic.mod(as + ds)] !== -1) return false;
+    }
+    return true;
+  },
+
+  place(grid, cells, ar, as, color) {
+    const g = Logic.cloneGrid(grid);
+    for (const [dr, ds] of cells) g[ar + dr][Logic.mod(as + ds)] = color;
+    return g;
+  },
+
+  findLines(grid) {
+    const rings = [], rays = [];
+    for (let r = 0; r < RINGS; r++) if (grid[r].every(v => v !== -1)) rings.push(r);
+    for (let s = 0; s < SECTORS; s++) {
+      let full = true;
+      for (let r = 0; r < RINGS; r++) if (grid[r][s] === -1) { full = false; break; }
+      if (full) rays.push(s);
+    }
+    return { rings, rays };
+  },
+
+  lineCount(lines) { return lines.rings.length + lines.rays.length; },
+
+  // Tyhjennettävät solut, kukin vain kerran
+  lineCells(lines) {
+    const seen = new Set(), out = [];
+    const add = (r, s) => { const k = r * SECTORS + s; if (!seen.has(k)) { seen.add(k); out.push([r, s]); } };
+    for (const r of lines.rings) for (let s = 0; s < SECTORS; s++) add(r, s);
+    for (const s of lines.rays) for (let r = 0; r < RINGS; r++) add(r, s);
+    return out;
+  },
+
+  clear(grid, lines) {
+    const g = Logic.cloneGrid(grid);
+    const cells = Logic.lineCells(lines).map(([r, s]) => ({ r, s, color: grid[r][s] }));
+    for (const c of cells) g[c.r][c.s] = -1;
+    return { grid: g, cells };
+  },
+
+  scoreLines(lines, mult) {
+    const n = Logic.lineCount(lines);
+    if (!n) return 0;
+    const base = lines.rings.length * RING_POINTS + lines.rays.length * RAY_POINTS;
+    return Math.round(base * (1 + EXTRA_LINE_BONUS * (n - 1)) * mult);
+  },
+
+  // dir = +1 myötäpäivään, -1 vastapäivään
+  rotate(grid, ring, dir) {
+    const g = Logic.cloneGrid(grid);
+    for (let s = 0; s < SECTORS; s++) g[ring][Logic.mod(s + dir)] = grid[ring][s];
+    return g;
+  },
+
+  fitsAnywhere(grid, cells) {
+    const minDr = Math.min(...cells.map(c => c[0]));
+    for (let ar = -minDr; ar < RINGS; ar++)
+      for (let as = 0; as < SECTORS; as++)
+        if (Logic.canPlace(grid, cells, ar, as)) return true;
+    return false;
+  },
+
+  anyMove(grid, tray) { return tray.some(p => p && Logic.fitsAnywhere(grid, p.cells)); },
+
+  comboMult(level) { return COMBO_STEPS[level]; },
+
+  nextComboLevel(level, cleared) { return cleared ? Math.min(level + 1, COMBO_STEPS.length - 1) : 0; },
+
+  addSpin(spins) { return Math.min(MAX_SPINS, spins + 1); },
+
+  makePiece(shape, rng = Math.random) {
+    return { shape, cells: shape.cells, color: Math.floor(rng() * COLORS.length) };
+  },
+
+  pieceWeight(size, level = 1) {
+    const shift = Math.max(0, level - 1);
+    const [lo, hi] = WEIGHT_LIMITS[size] || [1, 1];
+    const w = (WEIGHT_BY_SIZE[size] || 1) + (WEIGHT_SHIFT[size] || 0) * shift;
+    return Math.min(hi, Math.max(lo, w));
+  },
+
+  randomPiece(rng = Math.random, level = 1) {
+    const weights = PIECES.map(p => Logic.pieceWeight(p.cells.length, level));
+    const total = weights.reduce((a, w) => a + w, 0);
+    let x = rng() * total;
+    for (let i = 0; i < PIECES.length; i++) { x -= weights[i]; if (x < 0) return Logic.makePiece(PIECES[i], rng); }
+    return Logic.makePiece(PIECES[0], rng);
+  },
+
+  newTray(rng = Math.random, level = 1) {
+    return Array.from({ length: TRAY_SIZE }, () => Logic.randomPiece(rng, level));
+  },
+
+  levelFor(score) {
+    let lvl = 1;
+    LEVEL_THRESHOLDS.forEach((t, i) => { if (score >= t) lvl = i + 1; });
+    // viimeisen rajan jälkeen +1 taso jokaista 3500 pistettä kohden
+    const last = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+    if (score >= last) lvl += Math.floor((score - last) / 3500);
+    return lvl;
+  },
+
+  levelThreshold(level) {
+    const n = LEVEL_THRESHOLDS.length;
+    if (level <= n) return LEVEL_THRESHOLDS[level - 1];
+    return LEVEL_THRESHOLDS[n - 1] + (level - n) * 3500;
+  },
+
+  // Seuraavan automaattisen pyörähdyksen suunta (+1 myötä, -1 vasta)
+  pickDir(level, rng = Math.random) {
+    if (level < CCW_FROM_LEVEL) return 1;
+    const pCCW = Math.min(0.5, 0.3 + 0.05 * (level - CCW_FROM_LEVEL));
+    return rng() < pCCW ? -1 : 1;
+  },
+
+  asteroidInterval(level) { return Math.max(3, 7 - (level - ASTEROID_FROM_LEVEL)); },
+
+  // Satunnainen tyhjä solu; vältetään soluja, jotka täyttäisivät linjan (ei ilmaisia tyhjennyksiä)
+  pickAsteroidCell(grid, rng = Math.random) {
+    const empty = [], safe = [];
+    const before = Logic.lineCount(Logic.findLines(grid));
+    for (let r = 0; r < RINGS; r++) for (let s = 0; s < SECTORS; s++) {
+      if (grid[r][s] !== -1) continue;
+      empty.push([r, s]);
+      const g = Logic.cloneGrid(grid); g[r][s] = ROCK;
+      if (Logic.lineCount(Logic.findLines(g)) === before) safe.push([r, s]);
+    }
+    const pool = safe.length ? safe : empty;
+    return pool.length ? pool[Math.floor(rng() * pool.length)] : null;
+  },
+
+  newState(best = 0) {
+    return {
+      grid: Logic.emptyGrid(), tray: Logic.newTray(Math.random, 1), score: 0, best,
+      comboLevel: 0, spins: START_SPINS, activeRing: 0, turn: 0,
+      gameOver: false, hint: false,
+      level: 1, nextDir: 1, asteroidIn: null,
+    };
+  },
+};
+
+/* =====================================================================
+   TILA
+   ===================================================================== */
+function loadBest() { try { return parseInt(localStorage.getItem(BEST_KEY), 10) || 0; } catch (e) { return 0; } }
+function saveBest(v) { try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) { /* ei tallennusta */ } }
+
+let state = Logic.newState(loadBest());
+
+const view = {
+  size: 0, cx: 0, cy: 0, R: 0, r0: 0, rw: 0,
+  rotOffset: Array(RINGS).fill(0),
+  effects: [], particles: [], floaters: [],
+  drag: null, ghost: null, spinRing: -1,
+  debug: false, debugSlot: 0, busy: false,
+  landscape: false, traySlots: [], trayW: 0, trayH: 0,
+  time: 0, lastTime: 0, infoFlash: null,
+};
+
+/* =====================================================================
+   ANIMAATIOJONO
+   ===================================================================== */
+const tweens = [];
+function tween(ms, fn) {
+  return new Promise(res => tweens.push({ t0: performance.now(), ms, fn, res }));
+}
+function wait(ms) { return tween(ms, () => {}); }
+const easeOut = p => 1 - Math.pow(1 - p, 3);
+
+function updateTweens(now) {
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const t = tweens[i];
+    const p = Math.min(1, (now - t.t0) / t.ms);
+    t.fn(p);
+    if (p >= 1) { tweens.splice(i, 1); t.res(); }
+  }
+}
+
+/* =====================================================================
+   GEOMETRIA
+   ===================================================================== */
+const boardCanvas = document.getElementById('board');
+const bctx = boardCanvas.getContext('2d');
+const trayCanvas = document.getElementById('tray');
+const tctx = trayCanvas.getContext('2d');
+const overlayCanvas = document.getElementById('overlay');
+const octx = overlayCanvas.getContext('2d');
+
+function ringRadii(r) { return [view.r0 + r * view.rw, view.r0 + (r + 1) * view.rw]; }
+function sectorAngle(s) { return -Math.PI / 2 + s * STEP; }
+function polarToXY(ringF, sectorF) {
+  const rad = view.r0 + ringF * view.rw, a = sectorAngle(sectorF);
+  return [view.cx + Math.cos(a) * rad, view.cy + Math.sin(a) * rad];
+}
+function pointToPolar(x, y) {
+  const dx = x - view.cx, dy = y - view.cy;
+  const d = Math.hypot(dx, dy);
+  let rel = Math.atan2(dy, dx) + Math.PI / 2;
+  rel = ((rel % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  return { d, ringF: (d - view.r0) / view.rw, sectorF: rel / STEP };
+}
+function cellAt(x, y) {
+  const p = pointToPolar(x, y);
+  const r = Math.floor(p.ringF);
+  if (r < 0 || r >= RINGS) return null;
+  return { ring: r, sector: Logic.mod(Math.floor(p.sectorF)) };
+}
+
+function cellPath(ctx, cx, cy, rIn, rOut, a0, a1, gap) {
+  const ri = rIn + gap / 2, ro = rOut - gap / 2;
+  const pi = (gap / 2) / ri, po = (gap / 2) / ro;
+  ctx.beginPath();
+  ctx.arc(cx, cy, ro, a0 + po, a1 - po);
+  ctx.arc(cx, cy, ri, a1 - pi, a0 + pi, true);
+  ctx.closePath();
+}
+
+const shadeCache = new Map();
+function shade(hex, amt) {
+  const key = hex + amt;
+  if (shadeCache.has(key)) return shadeCache.get(key);
+  const n = parseInt(hex.slice(1), 16);
+  const t = amt < 0 ? 0 : 255, p = Math.abs(amt);
+  const ch = v => Math.round((t - v) * p + v);
+  const out = `rgb(${ch(n >> 16)},${ch((n >> 8) & 255)},${ch(n & 255)})`;
+  shadeCache.set(key, out);
+  return out;
+}
+
+function paintBlock(ctx, cx, cy, rIn, rOut, a0, a1, hex, gap, glow = true) {
+  cellPath(ctx, cx, cy, rIn, rOut, a0, a1, gap);
+  const g = ctx.createRadialGradient(cx, cy, rIn, cx, cy, rOut);
+  g.addColorStop(0, shade(hex, 0.35));
+  g.addColorStop(1, shade(hex, -0.2));
+  ctx.fillStyle = g;
+  if (glow) { ctx.shadowColor = hex; ctx.shadowBlur = 8; }
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255,255,255,.35)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function cellHex(v) { return v === ROCK ? ROCK_HEX : COLORS[v]; }
+
+const CRATERS = [[-0.22, -0.12, 0.15], [0.2, 0.18, 0.11], [0.12, -0.24, 0.08]];  // (kulma, säde, koko) suhteessa soluun
+function paintRock(ctx, cx, cy, rIn, rOut, a0, a1, gap) {
+  cellPath(ctx, cx, cy, rIn, rOut, a0, a1, gap);
+  const g = ctx.createRadialGradient(cx, cy, rIn, cx, cy, rOut);
+  g.addColorStop(0, '#aeb3c4');
+  g.addColorStop(1, '#4b5064');
+  ctx.fillStyle = g;
+  ctx.shadowColor = 'rgba(255,140,60,.35)'; ctx.shadowBlur = 6;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(15,17,30,.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+  const mid = (rIn + rOut) / 2, am = (a0 + a1) / 2, h = rOut - rIn;
+  ctx.fillStyle = 'rgba(28,30,45,.55)';
+  for (const [fa, fr, sz] of CRATERS) {
+    const a = am + fa * (a1 - a0), rr = mid + fr * h;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, h * sz, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function paintCell(ctx, cx, cy, rIn, rOut, a0, a1, v, gap) {
+  if (v === ROCK) paintRock(ctx, cx, cy, rIn, rOut, a0, a1, gap);
+  else paintBlock(ctx, cx, cy, rIn, rOut, a0, a1, COLORS[v], gap);
+}
+
+// Palikan polaarimuoto "virtuaalilaudalla" (R = 100) tarjotinta ja raahausta varten
+const VR = 100, VR0 = VR * CORE_RATIO, VRW = (VR - VR0) / RINGS;
+const layoutCache = new Map();
+function pieceLayout(shape) {
+  if (layoutCache.has(shape.id)) return layoutCache.get(shape.id);
+  const cells = shape.cells;
+  const maxDr = Math.max(...cells.map(c => c[0]));
+  const meanDs = cells.reduce((a, c) => a + c[1], 0) / cells.length;
+  const baseRing = Math.max(0, Math.min(RINGS - 1 - maxDr, Math.floor(RINGS / 2) - Math.ceil(maxDr / 2)));
+  const as = -(meanDs + 0.5);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const list = cells.map(([dr, ds]) => {
+    const c = {
+      rIn: VR0 + (baseRing + dr) * VRW, rOut: VR0 + (baseRing + dr + 1) * VRW,
+      a0: -Math.PI / 2 + (as + ds) * STEP, a1: -Math.PI / 2 + (as + ds + 1) * STEP,
+    };
+    for (let k = 0; k <= 8; k++) {
+      const a = c.a0 + (c.a1 - c.a0) * k / 8;
+      for (const rr of [c.rIn, c.rOut]) {
+        const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+      }
+    }
+    return c;
+  });
+  const lay = { list, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY };
+  layoutCache.set(shape.id, lay);
+  return lay;
+}
+
+function drawPolarPiece(ctx, shape, hex, px, py, scale, alpha = 1, glow = true) {
+  const lay = pieceLayout(shape);
+  const ox = px - lay.cx * scale, oy = py - lay.cy * scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (const c of lay.list) paintBlock(ctx, ox, oy, c.rIn * scale, c.rOut * scale, c.a0, c.a1, hex, Math.max(1, 2 * scale), glow);
+  ctx.restore();
+}
+
+/* =====================================================================
+   LAYOUT
+   ===================================================================== */
+function setupCanvas(cv, ctx, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function resize() {
+  const main = document.getElementById('main');
+  const W = window.innerWidth;
+  const H = window.innerHeight - document.getElementById('top').offsetHeight - document.getElementById('info').offsetHeight - 12;
+  view.landscape = W > H * 1.2;
+  main.className = view.landscape ? 'land' : 'port';
+  let size;
+  if (view.landscape) {
+    size = Math.min(H, (W - 36) / 1.36);
+    view.trayW = Math.round(size * 0.34); view.trayH = Math.round(size);
+  } else {
+    size = Math.min(W - 12, (H - 18) / 1.34);
+    view.trayW = Math.round(size);
+    view.trayH = Math.round(Math.max(size * 0.34, Math.min(H - size - 18, size * 0.48)));
+  }
+  size = Math.max(200, Math.floor(size));
+  view.size = size;
+  view.cx = view.cy = size / 2;
+  view.R = size / 2 - 8;
+  view.r0 = view.R * CORE_RATIO;
+  view.rw = (view.R - view.r0) / RINGS;
+  setupCanvas(boardCanvas, bctx, size, size);
+  setupCanvas(trayCanvas, tctx, view.trayW, view.trayH);
+  setupCanvas(overlayCanvas, octx, window.innerWidth, window.innerHeight);
+
+  view.traySlots = [];
+  for (let i = 0; i < TRAY_SIZE; i++) {
+    if (view.landscape) {
+      const h = view.trayH / TRAY_SIZE;
+      view.traySlots.push({ x: 0, y: i * h, w: view.trayW, h });
+    } else {
+      const w = view.trayW / TRAY_SIZE;
+      view.traySlots.push({ x: i * w, y: 0, w, h: view.trayH });
+    }
+  }
+  drawStars();
+}
+
+function drawStars() {
+  const cv = document.getElementById('stars'), ctx = cv.getContext('2d');
+  setupCanvas(cv, ctx, window.innerWidth, window.innerHeight);
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 160; i++) {
+    const x = rnd() * window.innerWidth, y = rnd() * window.innerHeight, r = rnd() * 1.3 + 0.2;
+    ctx.fillStyle = `rgba(200,215,255,${0.2 + rnd() * 0.6})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function render() {
+  const c = bctx, { cx, cy, R, r0, rw } = view, now = view.time;
+  c.clearRect(0, 0, view.size, view.size);
+
+  // taustahehku
+  const bg = c.createRadialGradient(cx, cy, r0 * 0.5, cx, cy, R + 8);
+  bg.addColorStop(0, 'rgba(60,80,170,.25)');
+  bg.addColorStop(0.85, 'rgba(30,40,100,.18)');
+  bg.addColorStop(1, 'rgba(30,40,100,0)');
+  c.fillStyle = bg;
+  c.beginPath(); c.arc(cx, cy, R + 8, 0, Math.PI * 2); c.fill();
+
+  // renkaiden hento hehku
+  c.save();
+  c.shadowColor = 'rgba(122,215,255,.6)'; c.shadowBlur = 6;
+  c.strokeStyle = 'rgba(122,215,255,.16)'; c.lineWidth = 1;
+  for (let r = 0; r <= RINGS; r++) { c.beginPath(); c.arc(cx, cy, r0 + r * rw, 0, Math.PI * 2); c.stroke(); }
+  c.restore();
+
+  // solut
+  const gap = Math.max(1.5, rw * 0.06);
+  for (let r = 0; r < RINGS; r++) {
+    const [ri, ro] = ringRadii(r);
+    const off = view.rotOffset[r];
+    for (let s = 0; s < SECTORS; s++) {
+      const a0 = sectorAngle(s) + off, a1 = a0 + STEP;
+      const v = state.grid[r][s];
+      if (v < 0) {
+        cellPath(c, cx, cy, ri, ro, a0, a1, gap);
+        c.fillStyle = 'rgba(140,160,255,.06)'; c.fill();
+        c.strokeStyle = 'rgba(140,170,255,.13)'; c.lineWidth = 1; c.stroke();
+      } else {
+        paintCell(c, cx, cy, ri, ro, a0, a1, v, gap);
+      }
+    }
+  }
+
+  drawActiveRing(c, now);
+
+  // spin-valinnan korostus
+  if (view.spinRing >= 0) {
+    const [ri, ro] = ringRadii(view.spinRing);
+    c.save();
+    c.strokeStyle = 'rgba(255,211,107,.9)'; c.lineWidth = 2.5;
+    c.shadowColor = '#ffd36b'; c.shadowBlur = 14;
+    c.beginPath(); c.arc(cx, cy, ri, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.arc(cx, cy, ro, 0, Math.PI * 2); c.stroke();
+    c.restore();
+  }
+
+  // ghost-esikatselu
+  const g = view.ghost;
+  if (g && view.drag) {
+    const fill = g.valid ? 'rgba(94,240,143,.45)' : 'rgba(255,93,115,.45)';
+    const stroke = g.valid ? 'rgba(160,255,190,.95)' : 'rgba(255,150,160,.9)';
+    for (const [dr, ds] of view.drag.piece.cells) {
+      const r = g.ar + dr;
+      if (r < 0 || r >= RINGS) continue;
+      const [ri, ro] = ringRadii(r);
+      const a0 = sectorAngle(g.as + ds);
+      cellPath(c, cx, cy, ri, ro, a0, a0 + STEP, gap);
+      c.fillStyle = fill; c.fill();
+      c.strokeStyle = stroke; c.lineWidth = 2; c.stroke();
+    }
+  }
+
+  // tyhjennysanimaatio
+  for (let i = view.effects.length - 1; i >= 0; i--) {
+    const e = view.effects[i];
+    const p = (now - e.t0) / CLEAR_MS;
+    if (p >= 1) { view.effects.splice(i, 1); continue; }
+    const [ri, ro] = ringRadii(e.r);
+    const a0 = sectorAngle(e.s), mid = (ri + ro) / 2;
+    if (p < 0.35) {
+      paintCell(c, cx, cy, ri, ro, a0, a0 + STEP, e.color, gap);
+      cellPath(c, cx, cy, ri, ro, a0, a0 + STEP, gap);
+      c.fillStyle = `rgba(255,255,255,${0.9 * Math.sin(p / 0.35 * Math.PI)})`; c.fill();
+    } else {
+      const q = (p - 0.35) / 0.65, k = 1 - q;
+      const h = (ro - ri) * k / 2, ac = a0 + STEP / 2, ha = STEP / 2 * k;
+      c.save(); c.globalAlpha = k;
+      paintBlock(c, cx, cy, mid - h, mid + h, ac - ha, ac + ha, cellHex(e.color), gap * k, false);
+      c.restore();
+    }
+  }
+
+  drawIncomingAsteroid(c);
+
+  drawCore(c);
+
+  // partikkelit
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  for (const pt of view.particles) {
+    c.globalAlpha = Math.max(0, pt.life / pt.max);
+    c.fillStyle = pt.color;
+    c.beginPath(); c.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+
+  // kelluvat tekstit
+  for (let i = view.floaters.length - 1; i >= 0; i--) {
+    const f = view.floaters[i];
+    const p = (now - f.t0) / f.dur;
+    if (p >= 1) { view.floaters.splice(i, 1); continue; }
+    c.save();
+    c.globalAlpha = p < 0.7 ? 1 : 1 - (p - 0.7) / 0.3;
+    c.font = `800 ${f.size}px system-ui, sans-serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const y = f.y - easeOut(p) * 36;
+    c.lineWidth = 4; c.strokeStyle = 'rgba(5,6,15,.85)'; c.strokeText(f.text, f.x, y);
+    c.fillStyle = f.color; c.fillText(f.text, f.x, y);
+    c.restore();
+  }
+
+  // debug-koordinaatit
+  if (view.debug) {
+    c.save();
+    c.font = `600 ${Math.max(8, rw * 0.22)}px monospace`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let r = 0; r < RINGS; r++) for (let s = 0; s < SECTORS; s++) {
+      const [x, y] = polarToXY(r + 0.5, s + 0.5);
+      c.fillStyle = state.grid[r][s] >= 0 ? '#000' : 'rgba(255,211,107,.85)';
+      c.fillText(`${r},${s}`, x, y);
+    }
+    c.restore();
+  }
+}
+
+function drawActiveRing(c, now) {
+  if (state.gameOver) return;
+  const { cx, cy, rw } = view;
+  const ar = state.activeRing;
+  const [ri, ro] = ringRadii(ar);
+  const pulse = 0.5 + 0.5 * Math.sin(now / 350);
+  const dir = state.nextDir;
+  const rgb = dir > 0 ? '122,215,255' : '255,211,107';   // vastapäivä korostetaan kullalla
+  c.save();
+  c.strokeStyle = `rgba(${rgb},${0.55 + 0.4 * pulse})`;
+  c.lineWidth = 2;
+  c.shadowColor = `rgb(${rgb})`; c.shadowBlur = 10 + 10 * pulse;
+  c.beginPath(); c.arc(cx, cy, ri, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.arc(cx, cy, ro, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = `rgba(${rgb},${0.05 + 0.05 * pulse})`;
+  c.beginPath(); c.arc(cx, cy, ro, 0, Math.PI * 2); c.arc(cx, cy, ri, 0, Math.PI * 2, true); c.fill();
+  c.restore();
+
+  // nuoli pyörimissuuntaan, liikkuu renkaan mukana
+  const mid = (ri + ro) / 2;
+  const base = -Math.PI / 2 + view.rotOffset[ar];
+  const tip = base + 0.42 * dir;
+  const lw = Math.max(2.5, rw * 0.14);
+  c.save();
+  c.lineCap = 'round';
+  for (const [col, w] of [['rgba(5,6,15,.7)', lw + 3], ['rgba(255,255,255,.92)', lw]]) {
+    c.strokeStyle = col; c.lineWidth = w;
+    c.beginPath(); c.arc(cx, cy, mid, base - 0.42, base + 0.42); c.stroke();
+  }
+  const hx = cx + Math.cos(tip) * mid, hy = cy + Math.sin(tip) * mid;
+  const tx = -Math.sin(tip) * dir, ty = Math.cos(tip) * dir;   // tangentti pyörimissuuntaan
+  const nx = Math.cos(tip), ny = Math.sin(tip);                // normaali
+  const hl = Math.max(7, rw * 0.36), hw = Math.max(5, rw * 0.26);
+  c.beginPath();
+  c.moveTo(hx + tx * hl * 0.6, hy + ty * hl * 0.6);
+  c.lineTo(hx - tx * hl * 0.4 + nx * hw, hy - ty * hl * 0.4 + ny * hw);
+  c.lineTo(hx - tx * hl * 0.4 - nx * hw, hy - ty * hl * 0.4 - ny * hw);
+  c.closePath();
+  c.lineWidth = 3; c.strokeStyle = 'rgba(5,6,15,.7)'; c.lineJoin = 'round'; c.stroke();
+  c.fillStyle = dir > 0 ? '#fff' : '#ffd36b'; c.fill();
+  c.restore();
+}
+
+function drawIncomingAsteroid(c) {
+  const inc = view.incoming;
+  if (!inc) return;
+  const p = Math.pow(inc.p, 1.5);   // kiihtyy loppua kohti
+  const pos = q => {
+    const [x0, y0] = polarToXY(RINGS + 0.05, inc.s - 1.5);
+    const [x1, y1] = polarToXY(inc.r + 0.5, inc.s + 0.5);
+    return [x0 + (x1 - x0) * q, y0 + (y1 - y0) * q];
+  };
+  const [x, y] = pos(p), [tx, ty] = pos(Math.max(0, p - 0.25));
+  const rad = view.rw * 0.3;
+  c.save();
+  const trail = c.createLinearGradient(tx, ty, x, y);
+  trail.addColorStop(0, 'rgba(255,120,40,0)');
+  trail.addColorStop(1, 'rgba(255,180,90,.85)');
+  c.strokeStyle = trail; c.lineWidth = rad * 1.3; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(tx, ty); c.lineTo(x, y); c.stroke();
+  const g = c.createRadialGradient(x - rad * 0.3, y - rad * 0.3, 0, x, y, rad);
+  g.addColorStop(0, '#c9cede'); g.addColorStop(1, '#4b5064');
+  c.fillStyle = g; c.shadowColor = '#ff8c3c'; c.shadowBlur = 16;
+  c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+
+function drawCore(c) {
+  const { cx, cy, r0 } = view;
+  const g = c.createRadialGradient(cx, cy, 0, cx, cy, r0 * 0.92);
+  g.addColorStop(0, '#1f2966'); g.addColorStop(1, '#0a0d24');
+  c.fillStyle = g;
+  c.beginPath(); c.arc(cx, cy, r0 * 0.92, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(122,215,255,.35)'; c.lineWidth = 1; c.stroke();
+  if (state.gameOver) return;
+  c.fillStyle = state.nextDir > 0 ? '#7ad7ff' : '#ffd36b';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = `600 ${r0 * 0.3}px system-ui, sans-serif`;
+  c.fillText(state.nextDir > 0 ? '↻' : '↺', cx, cy - r0 * 0.3);
+  c.font = `800 ${r0 * 0.5}px system-ui, sans-serif`;
+  c.fillText(String(state.activeRing + 1), cx, cy + r0 * 0.15);
+}
+
+function renderTray() {
+  const c = tctx;
+  c.clearRect(0, 0, view.trayW, view.trayH);
+  const scaleBase = view.R / VR * 0.55;
+  view.traySlots.forEach((sl, i) => {
+    const pad = 5;
+    c.fillStyle = 'rgba(20,26,54,.55)';
+    c.strokeStyle = 'rgba(122,215,255,.14)'; c.lineWidth = 1;
+    roundRect(c, sl.x + pad, sl.y + pad, sl.w - pad * 2, sl.h - pad * 2, 14);
+    c.fill(); c.stroke();
+    const p = state.tray[i];
+    if (!p) return;
+    const lay = pieceLayout(p.shape);
+    const scale = Math.min(scaleBase, (sl.w - 24) / lay.w, (sl.h - 24) / lay.h);
+    const dragging = view.drag && view.drag.slot === i;
+    const fits = Logic.fitsAnywhere(state.grid, p.cells);
+    const alpha = dragging ? 0.18 : (fits ? 1 : 0.35);
+    drawPolarPiece(c, p.shape, COLORS[p.color], sl.x + sl.w / 2, sl.y + sl.h / 2, scale, alpha);
+    if (view.debug) {
+      c.fillStyle = 'rgba(255,211,107,.8)'; c.font = '10px monospace'; c.textAlign = 'left';
+      c.fillText(p.shape.id, sl.x + 10, sl.y + 18);
+    }
+  });
+}
+
+function renderOverlay() {
+  octx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  const d = view.drag;
+  if (!d || (view.ghost && view.ghost.valid)) return;
+  // Leijuva palikka osoittimen kohdalla, kun se ei ole kelvollisessa kohdassa
+  drawPolarPiece(octx, d.piece.shape, COLORS[d.piece.color], d.x, d.y - d.lift,
+    view.R / VR, view.ghost ? 0.45 : 0.9);
+}
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+function updateParticles(dt) {
+  for (let i = view.particles.length - 1; i >= 0; i--) {
+    const p = view.particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { view.particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= 0.94; p.vy *= 0.94;
+  }
+}
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - (view.lastTime || now)) / 1000);
+  view.lastTime = now; view.time = now;
+  updateTweens(now);
+  updateParticles(dt);
+  render();
+  renderTray();
+  renderOverlay();
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+function updateHUD() {
+  $('scoreV').textContent = state.score;
+  $('bestV').textContent = Math.max(state.best, state.score);
+  const mult = Logic.comboMult(state.comboLevel);
+  $('comboV').textContent = 'x' + mult;
+  $('comboV').classList.toggle('hot', state.comboLevel > 0);
+  $('spinsV').textContent = '●'.repeat(state.spins) + '○'.repeat(MAX_SPINS - state.spins);
+  $('levelV').textContent = state.level;
+  const lo = Logic.levelThreshold(state.level), hi = Logic.levelThreshold(state.level + 1);
+  $('levelBar').style.width = Math.min(100, (state.score - lo) / (hi - lo) * 100) + '%';
+
+  const dirTxt = state.nextDir > 0 ? '↻' : '<span class="ccw">↺ counter-clockwise</span>';
+  let html = `Next to rotate: <b>ring ${state.activeRing + 1}</b> ${dirTxt}` +
+             ` <span style="opacity:.6">(1 = innermost)</span>`;
+  if (state.asteroidIn !== null) {
+    html += state.asteroidIn <= 1
+      ? ` · <span class="ccw">☄ asteroid after this turn!</span>`
+      : ` · ☄ in ${state.asteroidIn} turns`;
+  }
+  if (view.infoFlash && performance.now() < view.infoFlash.until) html = view.infoFlash.html;
+  else if (state.hint) html = `<span class="hint">No piece fits – use a spin: tap a ring!</span>`;
+  else if (state.spins > 0 && view.spinRing < 0 && state.turn === 0) html += ` · tap a ring to use a spin`;
+  $('info').innerHTML = html;
+}
+function flashInfo(html, ms = 1800) {
+  view.infoFlash = { html, until: performance.now() + ms };
+  updateHUD();
+  setTimeout(updateHUD, ms + 20);
+}
+
+/* =====================================================================
+   PELIN KULKU (animoitu)
+   ===================================================================== */
+function addFloater(x, y, text, color = '#fff', size = 18, dur = 900) {
+  view.floaters.push({ x, y, text, color, size, dur, t0: performance.now() });
+}
+
+function spawnParticles(x, y, hex, n = 6) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 180;
+    const life = 0.4 + Math.random() * 0.4;
+    view.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, max: life,
+      size: 1.2 + Math.random() * 2.2, color: hex });
+  }
+}
+
+async function animateRotate(ring, dir) {
+  state.grid = Logic.rotate(state.grid, ring, dir);
+  playSound('rotate');
+  await tween(ROTATE_MS, p => { view.rotOffset[ring] = -dir * STEP * (1 - easeOut(p)); });
+  view.rotOffset[ring] = 0;
+}
+
+// Tarkistaa ja tyhjentää linjat. Palauttaa true jos jotain tyhjeni.
+async function resolveClears(mult) {
+  const lines = Logic.findLines(state.grid);
+  const n = Logic.lineCount(lines);
+  if (!n) return false;
+  const pts = Logic.scoreLines(lines, mult);
+  const res = Logic.clear(state.grid, lines);
+  state.grid = res.grid;
+  state.score += pts;
+  if (n >= 2) state.spins = Logic.addSpin(state.spins);
+
+  const t0 = performance.now();
+  let sx = 0, sy = 0;
+  for (const cell of res.cells) {
+    view.effects.push({ r: cell.r, s: cell.s, color: cell.color, t0 });
+    const [x, y] = polarToXY(cell.r + 0.5, cell.s + 0.5);
+    sx += x; sy += y;
+    spawnParticles(x, y, cellHex(cell.color));
+  }
+  // tekstin paikka: yksittäisellä säteellä säteen keskellä, muuten solujen painopisteessä
+  let fx = sx / res.cells.length, fy = sy / res.cells.length;
+  if (lines.rings.length === 0 && lines.rays.length === 1) [fx, fy] = polarToXY(RINGS / 2, lines.rays[0] + 0.5);
+  const label = n >= 3 ? 'MEGA!' : n === 2 ? 'DOUBLE!' : lines.rings.length ? 'RING!' : 'RAY!';
+  addFloater(fx, fy - 14, label, '#ffd36b', 16, 1000);
+  addFloater(fx, fy + 10, '+' + pts + (mult > 1 ? `  x${mult}` : ''), '#fff', 22, 1100);
+  if (n >= 2) addFloater(view.cx, view.cy + view.r0 + 12, '+1 SPIN', '#7ad7ff', 14, 1200);
+  playSound(n >= 2 ? 'multiclear' : 'clear', mult);
+  if (n >= 2) playSound('spinGain');
+  updateHUD();
+  await wait(CLEAR_MS);
+  return true;
+}
+
+function checkEnd() {
+  if (Logic.anyMove(state.grid, state.tray)) { state.hint = false; return; }
+  if (state.spins > 0) { state.hint = true; return; }
+  state.hint = false;
+  state.gameOver = true;
+  playSound('gameover');
+  if (state.score > state.best) { state.best = state.score; saveBest(state.best); }
+  setTimeout(showGameOver, 600);
+}
+
+function showGameOver() {
+  $('goScore').textContent = state.score;
+  const rec = state.score > 0 && state.score >= state.best;
+  $('goBest').innerHTML = rec ? '<span class="rec">New best!</span>' : `Best ${state.best}`;
+  $('gameover').classList.add('show');
+}
+
+function syncBest() {
+  if (state.score > state.best) { state.best = state.score; saveBest(state.best); }
+}
+
+async function commitPlacement(slot, ar, as) {
+  view.busy = true;
+  const piece = state.tray[slot];
+  state.grid = Logic.place(state.grid, piece.cells, ar, as, piece.color);
+  state.score += piece.cells.length;
+  state.tray[slot] = null;
+  playSound('place');
+  const mDr = piece.cells.reduce((a, c) => a + c[0], 0) / piece.cells.length;
+  const mDs = piece.cells.reduce((a, c) => a + c[1], 0) / piece.cells.length;
+  const [px, py] = polarToXY(ar + mDr + 0.5, as + mDs + 0.5);
+  addFloater(px, py, '+' + piece.cells.length, 'rgba(255,255,255,.8)', 13, 700);
+  if (state.tray.every(p => !p)) state.tray = Logic.newTray(Math.random, state.level);
+  updateHUD();
+
+  const mult = Logic.comboMult(state.comboLevel);
+  let cleared = await resolveClears(mult);
+  await wait(60);
+  await animateRotate(state.activeRing, state.nextDir);
+  cleared = (await resolveClears(mult)) || cleared;
+
+  state.comboLevel = Logic.nextComboLevel(state.comboLevel, cleared);
+  state.activeRing = (state.activeRing + 1) % RINGS;
+  state.turn++;
+  updateLevel();
+  await advanceHazards();
+  state.nextDir = Logic.pickDir(state.level);
+  syncBest();
+  checkEnd();
+  updateHUD();
+  view.busy = false;
+}
+
+async function useSpin(ring, dir) {
+  if (view.busy || state.spins <= 0 || state.gameOver) return;
+  view.busy = true;
+  state.spins--;
+  closeSpinPanel();
+  updateHUD();
+  await animateRotate(ring, dir);
+  await resolveClears(Logic.comboMult(state.comboLevel));
+  updateLevel();
+  syncBest();
+  checkEnd();
+  updateHUD();
+  view.busy = false;
+}
+
+function updateLevel() {
+  const lvl = Logic.levelFor(state.score);
+  if (lvl <= state.level) return;
+  state.level = lvl;
+  const msg = LEVEL_INFO[lvl] || (lvl > ASTEROID_FROM_LEVEL ? 'Asteroids fall more often' : '');
+  addFloater(view.cx, view.cy - view.r0 - 22, 'LEVEL ' + lvl, '#7ad7ff', 24, 1800);
+  flashInfo(`<b>Level ${lvl}</b>${msg ? ' – ' + msg : ''}`, 2800);
+  playSound('levelUp');
+}
+
+async function dropAsteroid() {
+  const cell = Logic.pickAsteroidCell(state.grid);
+  if (!cell) return;
+  const [r, s] = cell;
+  playSound('asteroid');
+  view.incoming = { r, s, p: 0 };
+  await tween(480, p => { view.incoming.p = p; });
+  view.incoming = null;
+  state.grid = Logic.place(state.grid, [[0, 0]], r, s, ROCK);
+  playSound('impact');
+  const [x, y] = polarToXY(r + 0.5, s + 0.5);
+  spawnParticles(x, y, '#ff9a4a', 16);
+  spawnParticles(x, y, ROCK_HEX, 8);
+  // linja täyttyy vain, jos turvallista solua ei ollut
+  await resolveClears(Logic.comboMult(state.comboLevel));
+}
+
+async function advanceHazards() {
+  if (state.level < ASTEROID_FROM_LEVEL) return;
+  if (state.asteroidIn === null) { state.asteroidIn = Logic.asteroidInterval(state.level); return; }
+  state.asteroidIn--;
+  if (state.asteroidIn > 0) return;
+  await dropAsteroid();
+  state.asteroidIn = Logic.asteroidInterval(state.level);
+}
+
+function newGame() {
+  state = Logic.newState(Math.max(loadBest(), state.best));
+  view.effects = []; view.particles = []; view.floaters = [];
+  view.rotOffset.fill(0);
+  view.drag = null; view.ghost = null; view.incoming = null;
+  closeSpinPanel();
+  $('gameover').classList.remove('show');
+  updateHUD();
+}
+
+/* =====================================================================
+   SYÖTE (Pointer Events)
+   ===================================================================== */
+function boardPoint(clientX, clientY) {
+  const rc = boardCanvas.getBoundingClientRect();
+  return [clientX - rc.left, clientY - rc.top];
+}
+
+function computeGhost(x, y, cells) {
+  const p = pointToPolar(x, y);
+  if (p.d > view.R + view.rw * 1.2) return null;
+  const mDr = cells.reduce((a, c) => a + c[0], 0) / cells.length;
+  const mDs = cells.reduce((a, c) => a + c[1], 0) / cells.length;
+  const bR = Math.round(p.ringF - 0.5 - mDr), bS = Math.round(p.sectorF - 0.5 - mDs);
+  let best = null;
+  for (let dr = -1; dr <= 1; dr++) for (let ds = -1; ds <= 1; ds++) {
+    const ar = bR + dr, as = bS + ds;
+    if (!Logic.canPlace(state.grid, cells, ar, as)) continue;
+    const [gx, gy] = polarToXY(ar + mDr + 0.5, as + mDs + 0.5);
+    const dist = Math.hypot(gx - x, gy - y);
+    if (!best || dist < best.dist) best = { ar, as: Logic.mod(as), valid: true, dist };
+  }
+  return best || { ar: bR, as: Logic.mod(bS), valid: false };
+}
+
+function updateDrag(e) {
+  const d = view.drag;
+  d.x = e.clientX; d.y = e.clientY;
+  const [bx, by] = boardPoint(d.x, d.y - d.lift);
+  view.ghost = computeGhost(bx, by, d.piece.cells);
+}
+
+trayCanvas.addEventListener('pointerdown', e => {
+  if (view.busy || state.gameOver || view.drag) return;
+  const rc = trayCanvas.getBoundingClientRect();
+  const x = e.clientX - rc.left, y = e.clientY - rc.top;
+  const slot = view.traySlots.findIndex(s => x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h);
+  if (slot < 0 || !state.tray[slot]) return;
+  e.preventDefault();
+  closeSpinPanel();
+  try { trayCanvas.setPointerCapture(e.pointerId); } catch (err) { /* capture ei saatavilla */ }
+  view.drag = {
+    slot, piece: state.tray[slot], pointerId: e.pointerId, x: e.clientX, y: e.clientY,
+    lift: e.pointerType === 'touch' ? view.rw * 1.8 : 0,
+  };
+  updateDrag(e);
+  playSound('pick');
+});
+
+trayCanvas.addEventListener('pointermove', e => {
+  if (!view.drag || e.pointerId !== view.drag.pointerId) return;
+  e.preventDefault();
+  updateDrag(e);
+});
+
+function endDrag(e, cancel) {
+  const d = view.drag;
+  if (!d || e.pointerId !== d.pointerId) return;
+  const g = view.ghost;
+  view.drag = null; view.ghost = null;
+  if (!cancel && g && g.valid && !view.busy) commitPlacement(d.slot, g.ar, g.as);
+  else if (!cancel && g && !g.valid) playSound('invalid');
+}
+trayCanvas.addEventListener('pointerup', e => endDrag(e, false));
+trayCanvas.addEventListener('pointercancel', e => endDrag(e, true));
+
+// Laudan napautus → spin-merkin käyttö
+boardCanvas.addEventListener('pointerdown', e => {
+  if (view.busy || state.gameOver || view.drag) return;
+  const [x, y] = boardPoint(e.clientX, e.clientY);
+  const cell = cellAt(x, y);
+  if (!cell) { closeSpinPanel(); return; }
+  if (state.spins <= 0) { playSound('invalid'); flashInfo('No spins left – clear 2+ lines at once to earn more.'); return; }
+  openSpinPanel(cell.ring);
+});
+
+function openSpinPanel(ring) {
+  view.spinRing = ring;
+  $('spinLabel').textContent = `Ring ${ring + 1}`;
+  playSound('click');
+  $('spinPanel').classList.add('show');
+  updateHUD();
+}
+function closeSpinPanel() {
+  view.spinRing = -1;
+  $('spinPanel').classList.remove('show');
+}
+$('spinCCW').addEventListener('click', () => { if (view.spinRing >= 0) useSpin(view.spinRing, -1); });
+$('spinCW').addEventListener('click', () => { if (view.spinRing >= 0) useSpin(view.spinRing, +1); });
+$('spinCancel').addEventListener('click', () => { closeSpinPanel(); updateHUD(); });
+$('newGame').addEventListener('click', () => { playSound('click'); newGame(); });
+$('muteBtn').addEventListener('click', () => setMuted(!muted));
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'd' || e.key === 'D') toggleDebug();
+  if (e.key === 'm' || e.key === 'M') setMuted(!muted);
+  if (e.key === 'Escape') { closeSpinPanel(); updateHUD(); }
+});
+window.addEventListener('resize', resize);
+
+/* =====================================================================
+   DEBUG
+   ===================================================================== */
+function toggleDebug() {
+  view.debug = !view.debug;
+  $('debugPanel').classList.toggle('show', view.debug);
+}
+
+function buildDebugPanel() {
+  const wrap = $('debugPieces');
+  PIECES.forEach((shape, i) => {
+    const cv = document.createElement('canvas');
+    cv.title = shape.id;
+    const ctx = cv.getContext('2d');
+    setupCanvas(cv, ctx, 50, 50);
+    const lay = pieceLayout(shape);
+    drawPolarPiece(ctx, shape, COLORS[i % COLORS.length], 25, 25, Math.min(40 / lay.w, 40 / lay.h, 0.9), 1, false);
+    cv.addEventListener('click', () => {
+      if (view.busy) return;
+      state.tray[view.debugSlot] = Logic.makePiece(shape);
+      view.debugSlot = (view.debugSlot + 1) % TRAY_SIZE;
+      if (state.gameOver) { state.gameOver = false; $('gameover').classList.remove('show'); }
+      checkEnd(); updateHUD();
+    });
+    wrap.appendChild(cv);
+  });
+  $('dbgClear').addEventListener('click', () => { if (!view.busy) { state.grid = Logic.emptyGrid(); checkEnd(); updateHUD(); } });
+  $('dbgSpin').addEventListener('click', () => { state.spins = Logic.addSpin(state.spins); checkEnd(); updateHUD(); });
+  $('dbgLevel').addEventListener('click', () => {
+    state.score = Math.max(state.score, Logic.levelThreshold(state.level + 1));
+    updateLevel(); updateHUD();
+  });
+  $('dbgRock').addEventListener('click', async () => {
+    if (view.busy) return;
+    view.busy = true;
+    await dropAsteroid();
+    view.busy = false;
+    checkEnd(); updateHUD();
+  });
+  $('dbgDir').addEventListener('click', () => { state.nextDir = -state.nextDir; updateHUD(); });
+}
+
+/* =====================================================================
+   KÄYNNISTYS
+   ===================================================================== */
+resize();
+setMuted(muted, true);
+buildDebugPanel();
+updateHUD();
+requestAnimationFrame(frame);
+
+// Testauskoukku
+window.Orbit = { Logic, get state() { return state; }, set state(s) { state = s; }, view, commitPlacement, useSpin, newGame, computeGhost, polarToXY, cellAt, updateHUD, checkEnd, frame, playSound, SOUNDS, get muted() { return muted; } };
+</script>
+</body>
+</html>

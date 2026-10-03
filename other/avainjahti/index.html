@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key Hunt — Bitcoin key space scanner</title>
+<style>
+  :root {
+    --bg:        #070707;
+    --bg-grid:   #101010;
+    --surface:   #101010;
+    --surface-2: #161616;
+    --surface-3: #1c1c1c;
+    --line:      #242424;
+    --line-2:    #303030;
+    --txt:       #f4f4f4;
+    --dim:       #8d8d8d;
+    --dimmer:    #5a5a5a;
+    --orange:    #ff7a00;
+    --orange-2:  #ffa250;
+    --orange-3:  #ffd0a0;
+    --orange-bg: rgba(255,122,0,.10);
+    --red:       #ff4136;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --r: 12px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { color-scheme: dark; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 600px at 50% -220px, rgba(255,122,0,.10), transparent 70%),
+      linear-gradient(var(--bg-grid) 1px, transparent 1px) 0 0 / 100% 44px,
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px) 0 0 / 44px 100%,
+      var(--bg);
+    color: var(--txt);
+    font-family: var(--sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell { max-width: 1240px; margin: 0 auto; padding: 0 20px 72px; }
+
+  code, .mono { font-family: var(--mono); }
+
+  /* ---------------- Otsake ---------------- */
+
+  header.top {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 16px 0 14px;
+    margin-bottom: 18px;
+    background: rgba(7,7,7,.82);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand { display: flex; align-items: center; gap: 13px; margin-right: auto; }
+
+  .logo {
+    width: 40px; height: 40px; border-radius: 11px;
+    display: grid; place-items: center;
+    font-size: 21px; font-weight: 700; color: #0a0a0a;
+    background: linear-gradient(145deg, var(--orange-2), var(--orange));
+    box-shadow: 0 0 0 1px rgba(255,122,0,.4), 0 6px 22px -6px rgba(255,122,0,.7);
+  }
+
+  .brand h1 {
+    margin: 0; font-size: 16px; font-weight: 650;
+    letter-spacing: .22em; text-transform: uppercase;
+  }
+  .brand p { margin: 2px 0 0; font-size: 11.5px; color: var(--dim); letter-spacing: .04em; }
+
+  /* Segmentoitu LIVE / DEMO -valitsin */
+  .seg {
+    display: inline-flex; padding: 3px; gap: 3px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .seg button {
+    appearance: none; border: 0; cursor: pointer;
+    background: transparent; color: var(--dim);
+    font: 600 11px/1 var(--sans); letter-spacing: .13em; text-transform: uppercase;
+    padding: 8px 15px; border-radius: 7px; transition: .16s;
+  }
+  .seg button:hover { color: var(--txt); }
+  .seg button[aria-pressed="true"] {
+    background: var(--orange); color: #0a0a0a;
+    box-shadow: 0 3px 14px -4px rgba(255,122,0,.8);
+  }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--dim); white-space: nowrap;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dimmer); flex: none; }
+  .pill[data-state="run"]  { color: var(--orange-2); border-color: rgba(255,122,0,.35); }
+  .pill[data-state="run"]  .dot { background: var(--orange); animation: pulse 1.1s infinite; }
+  .pill[data-state="hit"]  { color: #0a0a0a; background: var(--orange); border-color: var(--orange); }
+  .pill[data-state="hit"]  .dot { background: #0a0a0a; }
+  .pill[data-state="err"]  { color: var(--red); border-color: rgba(255,65,54,.4); }
+  .pill[data-state="err"]  .dot { background: var(--red); }
+
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
+
+  .selftest {
+    font: 600 10px/1 var(--mono); letter-spacing: .1em;
+    color: var(--dimmer); padding: 7px 10px; border: 1px dashed var(--line-2); border-radius: 8px;
+  }
+  .selftest.pass { color: var(--dim); }
+  .selftest.fail { color: var(--red); border-color: var(--red); border-style: solid; }
+
+  /* ---------------- Sykliraita ---------------- */
+
+  .cycle {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 20px;
+  }
+  .track {
+    flex: 1; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden;
+  }
+  .track i {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--orange), var(--orange-2));
+    box-shadow: 0 0 12px rgba(255,122,0,.7);
+  }
+  .cycle .label {
+    font: 600 11px/1 var(--mono); color: var(--dim);
+    letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+    min-width: 168px;
+  }
+  .cycle .label b { color: var(--orange-2); font-weight: 600; }
+
+  /* ---------------- Tilastot ---------------- */
+
+  .stats {
+    display: grid; gap: 10px; margin-bottom: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .tile {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r); padding: 14px 16px;
+  }
+  .tile .k {
+    font: 600 10px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase;
+    color: var(--dimmer); margin-bottom: 9px;
+  }
+  .tile .v { font: 400 22px/1 var(--mono); letter-spacing: -.01em; }
+  .tile .v small { font-size: 12px; color: var(--dim); margin-left: 3px; }
+  .tile.accent { border-color: rgba(255,122,0,.32); background: linear-gradient(var(--orange-bg), transparent); }
+  .tile.accent .v { color: var(--orange-2); }
+
+  /* ---------------- Paneelit ---------------- */
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r); padding: 16px; margin-bottom: 18px;
+  }
+  .panel > h2 {
+    margin: 0 0 14px; font: 600 10.5px/1 var(--sans);
+    letter-spacing: .18em; text-transform: uppercase; color: var(--dimmer);
+  }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .field > span {
+    font: 600 10px/1 var(--sans); letter-spacing: .14em;
+    text-transform: uppercase; color: var(--dimmer);
+  }
+  .field input[type="number"], .field select {
+    appearance: none; background: var(--surface-2); color: var(--txt);
+    border: 1px solid var(--line-2); border-radius: 9px;
+    padding: 9px 11px; font: 400 13px/1.2 var(--mono); min-width: 108px;
+  }
+  .field select { padding-right: 30px; background-image:
+    linear-gradient(45deg, transparent 50%, var(--dim) 50%),
+    linear-gradient(135deg, var(--dim) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+  .field input:focus, .field select:focus {
+    outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,122,0,.16);
+  }
+
+  .checks { display: flex; flex-direction: column; gap: 9px; }
+  .check { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 12.5px; color: var(--dim); }
+  .check input { accent-color: var(--orange); width: 15px; height: 15px; cursor: pointer; }
+  .check:hover { color: var(--txt); }
+
+  .spacer { flex: 1 1 20px; }
+
+  button.btn {
+    appearance: none; cursor: pointer;
+    border: 1px solid var(--line-2); background: var(--surface-2); color: var(--txt);
+    font: 600 11.5px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase;
+    padding: 12px 20px; border-radius: 9px; transition: .16s;
+  }
+  button.btn:hover { border-color: var(--dim); background: var(--surface-3); }
+  button.btn.primary {
+    background: var(--orange); border-color: var(--orange); color: #0a0a0a;
+    box-shadow: 0 5px 20px -6px rgba(255,122,0,.85);
+  }
+  button.btn.primary:hover { background: var(--orange-2); border-color: var(--orange-2); }
+  button.btn.ghost { background: transparent; color: var(--dim); }
+  button.btn.ghost:hover { color: var(--txt); }
+  button.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  button.btn.armed {
+    color: var(--orange); border-color: var(--orange); background: var(--orange-bg);
+    animation: armedPulse 1s ease-in-out infinite;
+  }
+  @keyframes armedPulse { 50% { background: rgba(255,122,0,.24); } }
+
+  /* ---------------- Kertoimet ---------------- */
+
+  .odds {
+    display: grid; gap: 12px 28px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    padding: 15px 16px; margin-bottom: 18px;
+    border: 1px dashed var(--line-2); border-radius: var(--r);
+    background: rgba(16,16,16,.55);
+  }
+  .odds div { font-size: 12px; color: var(--dim); }
+  .odds b { display: block; font: 400 14px/1.4 var(--mono); color: var(--orange-3); margin-top: 3px; }
+
+  /* ---------------- Taulukko ---------------- */
+
+  .tablewrap {
+    border: 1px solid var(--line); border-radius: var(--r);
+    background: var(--surface); overflow: auto; margin-bottom: 18px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--surface-2);
+    font: 600 10px/1 var(--sans); letter-spacing: .15em; text-transform: uppercase;
+    color: var(--dimmer); text-align: left;
+    padding: 12px 14px; border-bottom: 1px solid var(--line-2); white-space: nowrap;
+  }
+  thead th.num { text-align: right; }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid #1a1a1a; vertical-align: middle; }
+  tbody tr.alt td { background: rgba(255,255,255,.016); }
+  tbody tr:hover td { background: rgba(255,122,0,.05); }
+  td.idx { font: 400 11px/1 var(--mono); color: var(--dimmer); width: 42px; }
+  td.wif { width: 1%; white-space: nowrap; }
+  td.addr code, td.wif code { font-size: 12px; letter-spacing: -.1px; }
+  td.bal { text-align: right; font-family: var(--mono); white-space: nowrap; width: 1%; color: var(--dimmer); }
+  td.bal.zero { color: #3d3d3d; }
+  td.bal.pending { color: var(--dimmer); }
+  td.bal.used { color: var(--orange-3); }
+  td.bal.hit {
+    color: var(--orange); font-weight: 600;
+    text-shadow: 0 0 16px rgba(255,122,0,.9);
+  }
+  tr.hitrow td { background: rgba(255,122,0,.12) !important; }
+  tr.hitrow td:first-child { box-shadow: inset 3px 0 0 var(--orange); }
+
+  .badge {
+    display: inline-block; padding: 3px 8px; border-radius: 5px;
+    font: 600 9.5px/1.35 var(--mono); letter-spacing: .09em;
+    background: var(--surface-3); color: var(--dim); border: 1px solid var(--line-2);
+  }
+  .badge.b32 { color: var(--orange-3); border-color: rgba(255,122,0,.28); background: var(--orange-bg); }
+
+  [data-copy] { cursor: pointer; border-bottom: 1px dotted transparent; transition: .14s; }
+  [data-copy]:hover { color: var(--orange-2); border-bottom-color: rgba(255,122,0,.5); }
+  [data-copy].copied { color: var(--orange); border-bottom-color: transparent; }
+
+  .empty { padding: 40px 16px; text-align: center; color: var(--dimmer); font-size: 13px; }
+
+  /* ---------------- Löydöt ---------------- */
+
+  .find {
+    border: 1px solid rgba(255,122,0,.32); border-radius: 10px;
+    background: linear-gradient(var(--orange-bg), transparent);
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .find .row1 { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .find .amt { font: 600 17px/1 var(--mono); color: var(--orange); }
+  .find .when { font-size: 11px; color: var(--dimmer); margin-left: auto; font-family: var(--mono); }
+  .find dl { display: grid; grid-template-columns: 104px 1fr; gap: 6px 14px; margin: 0; }
+  .find dt { font: 600 9.5px/1.7 var(--sans); letter-spacing: .13em; text-transform: uppercase; color: var(--dimmer); }
+  .find dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .find .acts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .find .acts button { padding: 7px 13px; font-size: 10px; }
+
+  /* ---------------- Hälytys ---------------- */
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: grid; place-items: center; padding: 24px;
+    background: rgba(0,0,0,.86); backdrop-filter: blur(8px);
+    animation: fade .25s ease-out;
+  }
+  @keyframes fade { from { opacity: 0; } }
+  .overlay[hidden] { display: none !important; }
+
+  .alert {
+    width: min(660px, 100%); max-height: 86vh; overflow: auto;
+    background: #0c0c0c; border: 1px solid var(--orange); border-radius: 16px;
+    box-shadow: 0 0 0 1px rgba(255,122,0,.25), 0 0 90px -10px rgba(255,122,0,.55);
+    padding: 26px 26px 22px;
+    animation: rise .3s cubic-bezier(.2,.8,.3,1);
+  }
+  @keyframes rise { from { transform: translateY(14px) scale(.98); opacity: 0; } }
+
+  .alert .banner {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 6px;
+  }
+  .alert .siren {
+    width: 11px; height: 11px; border-radius: 50%; background: var(--orange);
+    box-shadow: 0 0 0 0 rgba(255,122,0,.7); animation: siren 1.4s infinite;
+  }
+  @keyframes siren {
+    0%   { box-shadow: 0 0 0 0 rgba(255,122,0,.7); }
+    70%  { box-shadow: 0 0 0 16px rgba(255,122,0,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,122,0,0); }
+  }
+  .alert h2 {
+    margin: 0; font: 700 26px/1.1 var(--sans); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--orange);
+  }
+  .alert .lead { margin: 0 0 20px; color: var(--dim); font-size: 13px; }
+  .alert .amt { font: 600 34px/1.1 var(--mono); color: #fff; margin: 0 0 20px; }
+  .alert .amt span { font-size: 15px; color: var(--dim); margin-left: 6px; }
+  .alert .acts { display: flex; gap: 9px; margin-top: 22px; flex-wrap: wrap; }
+
+  .kv { display: grid; grid-template-columns: 112px 1fr; gap: 9px 14px; }
+  .kv dt { font: 600 9.5px/1.7 var(--sans); letter-spacing: .13em; text-transform: uppercase; color: var(--dimmer); }
+  .kv dd { margin: 0; font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+
+  .warn {
+    margin-top: 20px; padding: 12px 14px; border-radius: 9px;
+    border: 1px solid var(--line-2); background: var(--surface-2);
+    font-size: 12px; color: var(--dim); line-height: 1.55;
+  }
+
+  .banner-msg {
+    margin-bottom: 18px; padding: 12px 15px; border-radius: 10px;
+    border: 1px solid rgba(255,65,54,.4); background: rgba(255,65,54,.08);
+    color: #ff8078; font-size: 12.5px; font-family: var(--mono);
+  }
+  .banner-msg[hidden] { display: none; }
+
+  footer.foot {
+    margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line);
+    color: var(--dimmer); font-size: 11.5px; line-height: 1.7;
+  }
+  footer.foot b { color: var(--dim); font-weight: 600; }
+
+  @media (max-width: 720px) {
+    .brand p { display: none; }
+    .cycle .label { min-width: 0; }
+    .find dl, .kv { grid-template-columns: 1fr; gap: 3px; }
+    .find dt, .kv dt { margin-top: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">₿</div>
+      <div>
+        <h1>Key Hunt</h1>
+        <p>Bitcoin key space scanner</p>
+      </div>
+    </div>
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="modeLive" aria-pressed="true">Live</button>
+      <button id="modeDemo" aria-pressed="false">Demo</button>
+    </div>
+    <span class="selftest" id="selftest">self-test…</span>
+    <span class="pill" id="status" data-state="idle"><i class="dot"></i><span id="statusText">Ready</span></span>
+  </header>
+
+  <div class="cycle">
+    <span class="label" id="cycleLabel">Stopped</span>
+    <span class="track"><i id="cycleBar"></i></span>
+  </div>
+
+  <div class="banner-msg" id="apiBanner" hidden></div>
+
+  <section class="stats">
+    <div class="tile"><div class="k">Cycles</div><div class="v" id="sCycles">0</div></div>
+    <div class="tile"><div class="k">Keys generated</div><div class="v" id="sKeys">0</div></div>
+    <div class="tile"><div class="k">Addresses checked</div><div class="v" id="sAddrs">0</div></div>
+    <div class="tile"><div class="k">Speed</div><div class="v" id="sRate">0<small>addr/s</small></div></div>
+    <div class="tile"><div class="k">Run time</div><div class="v" id="sTime">00:00:00</div></div>
+    <div class="tile accent"><div class="k">Hits</div><div class="v" id="sHits">0</div></div>
+  </section>
+
+  <section class="panel">
+    <h2>Settings</h2>
+    <div class="controls">
+      <label class="field">
+        <span>Refresh interval</span>
+        <input type="number" id="cInterval" min="1" max="3600" step="1" value="5" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Keys / cycle</span>
+        <input type="number" id="cBatch" min="1" max="200" step="1" value="30" autocomplete="off">
+      </label>
+      <label class="field" id="demoOddsField">
+        <span>Demo: hit odds</span>
+        <select id="cOdds" autocomplete="off">
+          <option value="0">Never</option>
+          <option value="100">1 : 100</option>
+          <option value="1000" selected>1 : 1,000</option>
+          <option value="10000">1 : 10,000</option>
+          <option value="100000">1 : 100,000</option>
+        </select>
+      </label>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="cHard" autocomplete="off"> Hard page reload (location.reload)</label>
+        <label class="check"><input type="checkbox" id="cUsed" autocomplete="off"> Also stop on a used address (n_tx&nbsp;&gt;&nbsp;0)</label>
+        <label class="check"><input type="checkbox" id="cSound" checked autocomplete="off"> Beep on hit</label>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn primary" id="btnStart">Start</button>
+      <button class="btn" id="btnOnce">Single cycle</button>
+      <button class="btn ghost" id="btnReset">Reset counters</button>
+    </div>
+  </section>
+
+  <section class="odds">
+    <div>Address space (HASH160)<b>2<sup>160</sup> ≈ 1.46 × 10<sup>48</sup></b></div>
+    <div>Probability of a hit so far<b id="oProb">1 : –</b></div>
+    <div>Time to cover the whole space at this rate<b id="oTime">–</b></div>
+  </section>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Private key (WIF)</th>
+          <th>Type</th>
+          <th>Address</th>
+          <th class="num">Balance (BTC)</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="tableEmpty">Press <b>Start</b> to begin scanning.</div>
+  </div>
+
+  <section class="panel" id="findsPanel" hidden>
+    <h2>Saved finds</h2>
+    <div id="findsList"></div>
+    <div class="controls" style="margin-top:14px">
+      <button class="btn" id="btnExport">Download all (JSON)</button>
+      <button class="btn ghost" id="btnClearFinds">Clear finds</button>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <b>How this works:</b> each cycle draws <span id="fBatch">30</span> private keys
+    with the browser's cryptographic random number generator, derives their public keys on the
+    secp256k1 curve and from those the legacy (P2PKH) and bech32 (P2WPKH) addresses, and looks up the balances.
+    All keys are computed locally in the browser — only the finished addresses are sent over the network.<br>
+    <b>Reality check:</b> the address space is 2<sup>160</sup> and there are ~5&nbsp;×&nbsp;10<sup>7</sup> funded addresses.
+    The probability of a hit per address is therefore about 1 : 10<sup>40</sup>. This page is an illustration
+    of the size of the key space, not a working search method.<br>
+    <b>Balance source:</b> blockchain.info (batched), with mempool.space as a fallback. The free APIs have
+    rate limits — if you get 429 errors, increase the refresh interval or reduce the batch size.
+  </footer>
+
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="alert" role="alertdialog" aria-labelledby="alertTitle">
+    <div class="banner"><i class="siren"></i><h2 id="alertTitle">Hit</h2></div>
+    <p class="lead" id="alertLead">Scanning stopped.</p>
+    <p class="amt" id="alertAmt">0 <span>BTC</span></p>
+    <dl class="kv" id="alertKv"></dl>
+    <div class="warn" id="alertWarn"></div>
+    <div class="acts">
+      <button class="btn primary" id="aCopyWif">Copy WIF</button>
+      <button class="btn" id="aCopyAddr">Copy address</button>
+      <button class="btn" id="aDownload">Download JSON</button>
+      <button class="btn ghost" id="aResume">Resume scanning</button>
+      <button class="btn ghost" id="aClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="btc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

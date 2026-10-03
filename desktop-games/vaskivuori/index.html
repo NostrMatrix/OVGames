@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copper Mountain</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b0d10'/><text x='16' y='23' font-size='22' font-weight='700' text-anchor='middle' fill='%23d58b4c' font-family='monospace'>@</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
+    --tausta: #0b0d10;
+    --paneeli: #12151a;
+    --paneeli-2: #181c22;
+    --reuna: #252b33;
+    --teksti: #cfd5dc;
+    --himmea: #7d8793;
+    --vaski: #d58b4c;
+    --kulta: #e8c35c;
+    --hyva: #7fd07c;
+    --paha: #ff6b6b;
+    --tieto: #82b8ff;
+    --hp: #d9534f;
+    --mana: #4f8fe0;
+    --xp: #c79a3c;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--tausta);
+    color: var(--teksti);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  button { font: inherit; color: inherit; }
+
+  kbd {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 0 .35em;
+    border: 1px solid #3a414b;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: #1c2128;
+    color: #e6eaef;
+    font-family: var(--mono);
+    font-size: .9em;
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .app {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 10px 16px 16px;
+  }
+
+  /* --- yläpalkki --- */
+  .ylapalkki {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .ylapalkki h1 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: .28em;
+    text-transform: uppercase;
+    color: var(--vaski);
+  }
+  .kerrostieto {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--himmea);
+  }
+  .kerrostieto b { color: var(--teksti); font-weight: 600; }
+  .lukot { display: inline-flex; gap: 3px; }
+  .lukot i {
+    width: 9px;
+    height: 12px;
+    border: 1px solid #4a525d;
+    border-radius: 2px;
+  }
+  .lukot i.auki { background: var(--vaski); border-color: var(--vaski); }
+  .lukot i.louhi { border-color: #8fe3ff; }
+
+  /* --- asettelu --- */
+  .peli {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) 330px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "kartta kartta sivu"
+      "loki nakyvissa sivu";
+    gap: 10px;
+    align-items: start;
+  }
+  .kartta-ruutu { grid-area: kartta; }
+  .loki-ruutu { grid-area: loki; }
+  .nakyvissa-ruutu { grid-area: nakyvissa; }
+  .sivu { grid-area: sivu; display: grid; gap: 10px; }
+
+  .ruutu {
+    background: var(--paneeli);
+    border: 1px solid var(--reuna);
+    border-radius: 6px;
+    padding: 8px 10px 10px;
+    min-width: 0;
+  }
+  .ruutu > h2 {
+    margin: 0 0 6px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--vaski);
+  }
+
+  /* --- kartta --- */
+  .kartta-ruutu {
+    position: relative;
+    padding: 10px;
+    background: #090b0d;
+    min-height: 200px;
+  }
+  .kartta-ruutu.luodaan .kartta-kehys,
+  .kartta-ruutu.luodaan .alarivi,
+  .kartta-ruutu.luodaan .kosketus { display: none; }
+  .kartta-ruutu.luodaan .peite { position: static; padding: 22px 12px; }
+  .kartta-kehys { overflow-x: auto; scrollbar-width: thin; }
+  .kartta {
+    display: block;
+    width: max-content;
+    margin: 0 auto;
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: pre;
+    text-align: left;
+    color: var(--teksti);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .alarivi {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid var(--reuna);
+    color: var(--himmea);
+    font-size: 12px;
+  }
+  .pikaohje { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .pikaohje span { white-space: nowrap; }
+  .kohta { color: var(--teksti); min-height: 1.4em; }
+
+  .t-f { color: #56606c; }
+  .t-c { color: #6f7883; }
+  .t-w { color: #9ba6b4; }
+  .t-d { color: #c07f3f; }
+  .t-s { color: #fff; font-weight: 600; background: rgba(213, 139, 76, .32); border-radius: 2px; }
+  .t-l { color: #58bcff; font-weight: 600; }
+  .t-k { color: #4d545d; }
+  .i { font-weight: 600; }
+  .i-weapon { color: #8fd0ff; }
+  .i-armor { color: #c6a8ff; }
+  .i-food { color: #e2a968; }
+  .i-mesivoide { color: #ffcf4d; }
+  .i-mahla { color: #9be07a; }
+  .i-vakijuoma { color: #ff7a59; }
+  .i-scroll { color: #efe3bf; }
+  .i-arrows { color: #cdb57c; }
+  .i-silver { color: #e3e8ee; }
+  .i-sampo { color: #ffd84a; animation: hohto 1.4s ease-in-out infinite; }
+  @keyframes hohto { 50% { color: #fff6c9; text-shadow: 0 0 8px #ffd84a; } }
+  .m { font-weight: 600; }
+  .uni { opacity: .7; }
+  .kohde { background: rgba(255, 107, 107, .28); border-radius: 2px; }
+  .pl { font-weight: 600; text-shadow: 0 0 6px currentColor; }
+  .pl-urho { color: #ffb08a; }
+  .pl-tietaja { color: #a9d6ff; }
+  .pl-eramies { color: #b2eba3; }
+  .raivo { color: #ff4d4d; text-shadow: 0 0 8px #ff4d4d; }
+  .mem { opacity: .36; }
+
+  /* --- kosketusohjaimet (vain kosketusnäytöillä) --- */
+  .kosketus { display: none; }
+  @media (pointer: coarse) {
+    .kosketus {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      margin-top: 10px;
+    }
+    .pikaohje { display: none; }
+  }
+  .ristiohjain {
+    display: grid;
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(3, 48px);
+    gap: 4px;
+  }
+  .kosketus button {
+    border: 1px solid var(--reuna);
+    border-radius: 8px;
+    background: var(--paneeli-2);
+    font-size: 18px;
+    touch-action: manipulation;
+  }
+  .kosketus button:active { background: #262c35; }
+  .ristiohjain [data-suunta="0,-1"] { grid-area: 1 / 2; }
+  .ristiohjain [data-suunta="-1,0"] { grid-area: 2 / 1; }
+  .ristiohjain [data-toiminto="action"] { grid-area: 2 / 2; font-size: 13px; }
+  .ristiohjain [data-suunta="1,0"] { grid-area: 2 / 3; }
+  .ristiohjain [data-suunta="0,1"] { grid-area: 3 / 2; }
+  .kosketus .iso { padding: 12px 16px; font-size: 14px; }
+
+  /* --- loki --- */
+  .loki {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    height: calc(8 * 1.45em);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+  .loki li { color: var(--himmea); }
+  .loki li.uusi { color: var(--teksti); }
+  .loki li.uusi.hyva { color: var(--hyva); }
+  .loki li.uusi.paha { color: var(--paha); }
+  .loki li.uusi.tieto { color: var(--tieto); }
+  .loki li.uusi.kulta { color: var(--kulta); }
+  .loki li.uusi::before { content: '› '; color: var(--vaski); }
+
+  /* --- näkyvissä --- */
+  .jalat {
+    margin-bottom: 6px;
+    padding: 4px 7px;
+    border-radius: 4px;
+    background: var(--paneeli-2);
+    font-size: 12px;
+  }
+  .lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 12.5px;
+    max-height: calc(8 * 1.6em);
+    overflow: hidden;
+  }
+  .lista li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+  .lista li[data-x] { cursor: pointer; }
+  .lista li[data-x]:hover .ln { text-decoration: underline; }
+  .lista .ln { overflow: hidden; text-overflow: ellipsis; }
+  .g { display: inline-block; width: 1ch; text-align: center; font-weight: 600; }
+  .minipalkki {
+    flex: 0 0 42px;
+    height: 5px;
+    border-radius: 3px;
+    background: #2a2f37;
+    overflow: hidden;
+  }
+  .minipalkki i { display: block; height: 100%; background: var(--hp); }
+  .lista small { color: var(--himmea); }
+  .tag {
+    font-style: normal;
+    font-size: 10.5px;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: #262b33;
+    color: var(--himmea);
+  }
+  .tag.kohde-tag { background: rgba(255, 107, 107, .25); color: #ffb3b3; }
+  .tyhja-teksti { color: var(--himmea); font-size: 12px; }
+
+  /* --- hahmo --- */
+  .nimirivi {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .nimirivi b { font-size: 15px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nimirivi span { color: var(--himmea); white-space: nowrap; }
+  .mittari {
+    display: grid;
+    grid-template-columns: 38px 1fr 58px;
+    align-items: center;
+    gap: 8px;
+    margin: 3px 0;
+    font-size: 12px;
+  }
+  .m-nimi { color: var(--himmea); }
+  .m-arvo { text-align: right; font-variant-numeric: tabular-nums; }
+  .palkki {
+    height: 9px;
+    border-radius: 5px;
+    background: #242931;
+    overflow: hidden;
+  }
+  .palkki i { display: block; height: 100%; border-radius: 5px; transition: width .15s; }
+  .mittari.hp i { background: var(--hp); }
+  .mittari.mana i { background: var(--mana); }
+  .mittari.xp i { background: var(--xp); }
+  .mittari.vaara .m-arvo { color: var(--paha); font-weight: 600; }
+  .mittari.vaara i { animation: syke 1s ease-in-out infinite; }
+  @keyframes syke { 50% { opacity: .45; } }
+  .arvot {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 12px;
+    margin: 8px 0 0;
+    font-size: 12px;
+  }
+  .arvot div { display: flex; justify-content: space-between; }
+  .arvot dt { color: var(--himmea); }
+  .arvot dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .tilat { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tilat:empty { display: none; }
+  .tila {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(127, 208, 124, .15);
+    color: var(--hyva);
+  }
+  .tila.odota { background: #242931; color: var(--himmea); }
+  .kyky {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 6px 8px;
+    border: 1px solid #5a4028;
+    border-radius: 5px;
+    background: rgba(213, 139, 76, .1);
+    text-align: left;
+    cursor: pointer;
+  }
+  .kyky:hover { background: rgba(213, 139, 76, .18); }
+  .kyky b { display: block; color: var(--kulta); font-weight: 600; }
+  .kyky small { color: var(--himmea); }
+  .kyky.ei-valmis { border-color: var(--reuna); background: transparent; }
+  .kyky.ei-valmis b { color: var(--himmea); }
+
+  /* --- varusteet ja reppu --- */
+  .varuste, .reppu li {
+    display: grid;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    line-height: 1.75;
+  }
+  .varuste { grid-template-columns: 44px 1ch minmax(0, max-content) minmax(0, 1fr); }
+  .varuste .lj { color: var(--himmea); }
+  .varuste small, .reppu small {
+    color: var(--himmea);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+  }
+  .vn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reppu { list-style: none; margin: 0; padding: 0; }
+  .reppu li {
+    grid-template-columns: auto 1ch minmax(0, max-content) minmax(0, 1fr) 12px 18px;
+    padding: 0 2px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .reppu li:hover { background: var(--paneeli-2); }
+  .reppu li.tyhja { cursor: default; color: #474e58; }
+  .reppu li.tyhja:hover { background: none; }
+  .reppu li.tyhja kbd { opacity: .45; }
+  .vert { font-size: 10px; text-align: center; }
+  .vert.parempi { color: var(--hyva); }
+  .vert.huonompi { color: #6b5555; }
+  .hylkaa {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    color: #59616c;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .hylkaa:hover { background: #3a2626; color: var(--paha); }
+
+  .merkit {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--himmea);
+  }
+  .merkit span .g { margin-right: 6px; }
+
+  /* --- peitenäkymät (hahmonluonti ja pelin loppu) --- */
+  .peite {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+  .peite[hidden] { display: none; }
+  .peite.luonti-peite { background: radial-gradient(ellipse at 50% 0%, #1d1611 0%, #090b0d 65%); }
+  .peite.loppu-peite { background: rgba(6, 8, 10, .82); backdrop-filter: blur(2px); }
+
+  .luonti { max-width: 820px; width: 100%; text-align: center; }
+  .vuori {
+    margin: 0 auto;
+    color: var(--vaski);
+    font-size: 12px;
+    line-height: 1.1;
+    opacity: .9;
+  }
+  .luonti h2 {
+    margin: 4px 0 6px;
+    font-size: 30px;
+    letter-spacing: .32em;
+    text-transform: uppercase;
+    color: var(--kulta);
+  }
+  .tarina { max-width: 600px; margin: 0 auto 14px; color: #aab2bc; }
+  .nimikentta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    color: var(--himmea);
+  }
+  .nimikentta input {
+    width: 16ch;
+    padding: 6px 10px;
+    border: 1px solid #3a414b;
+    border-radius: 5px;
+    background: #0e1115;
+    color: #fff;
+    font: inherit;
+    font-size: 15px;
+  }
+  .nimikentta input:focus { outline: 2px solid var(--vaski); outline-offset: 1px; }
+  .luokat {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    text-align: left;
+  }
+  .luokka {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px 12px;
+    border: 1px solid var(--reuna);
+    border-radius: 6px;
+    background: var(--paneeli);
+    cursor: pointer;
+    text-align: left;
+  }
+  .luokka:hover, .luokka:focus-visible { border-color: var(--vaski); background: #17130f; outline: none; }
+  .luokka-otsikko { display: flex; align-items: center; gap: 8px; }
+  .luokka-otsikko b { font-size: 16px; color: #fff; }
+  .luokka-otsikko .g { margin-left: auto; font-size: 18px; }
+  .luokka p { margin: 0; font-size: 12px; color: #aab2bc; }
+  .luokka .arvorivi { color: var(--himmea); font-size: 11.5px; }
+  .luokka .kykyteksti b { color: var(--kulta); font-weight: 600; }
+  .luokka .alku { color: var(--himmea); font-size: 11.5px; }
+  .vihje { margin: 14px 0 0; color: var(--himmea); }
+
+  .loppu { max-width: 520px; text-align: center; }
+  .loppu pre { margin: 0 auto 6px; font-size: 13px; line-height: 1.15; display: inline-block; text-align: left; }
+  .hauta { color: #9ba6b4; }
+  .sampokuva { color: var(--kulta); }
+  .loppu h2 { margin: 6px 0; font-size: 24px; letter-spacing: .12em; }
+  .loppu h2.kuolema { color: var(--paha); }
+  .loppu h2.voitto { color: var(--kulta); }
+  .loppu p { margin: 0 0 10px; color: #aab2bc; }
+  .tulos {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    gap: 2px 24px;
+    margin: 0 0 14px;
+    text-align: left;
+  }
+  .tulos dt { color: var(--himmea); }
+  .tulos dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .tulos .pisteet { color: var(--kulta); font-weight: 600; }
+  .uusi-peli {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: 1px solid var(--vaski);
+    border-radius: 6px;
+    background: rgba(213, 139, 76, .14);
+    cursor: pointer;
+  }
+  .uusi-peli:hover { background: rgba(213, 139, 76, .26); }
+
+  /* --- kapeat näytöt --- */
+  @media (max-width: 1020px) {
+    .peli {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas:
+        "kartta kartta"
+        "loki nakyvissa"
+        "sivu sivu";
+    }
+    .sivu { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 640px) {
+    .app { padding: 8px 8px 16px; }
+    .peli {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "kartta" "loki" "nakyvissa" "sivu";
+    }
+    .sivu { grid-template-columns: 1fr; }
+    .luokat { grid-template-columns: 1fr; }
+    .kartta-ruutu { padding: 6px; }
+    .luonti h2 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="ylapalkki">
+    <h1>Copper Mountain</h1>
+    <div class="kerrostieto">
+      <span id="kerros"></span>
+      <span class="lukot" id="lukot" title="Opened locks"></span>
+    </div>
+  </header>
+
+  <main class="peli">
+    <section class="ruutu kartta-ruutu" id="kartta-ruutu">
+      <div class="kartta-kehys"><pre id="kartta" class="kartta" aria-label="Game map"></pre></div>
+      <div class="kosketus" id="kosketus">
+        <div class="ristiohjain">
+          <button data-suunta="0,-1" aria-label="Up">▲</button>
+          <button data-suunta="-1,0" aria-label="Left">◀</button>
+          <button data-toiminto="action" aria-label="Action">●</button>
+          <button data-suunta="1,0" aria-label="Right">▶</button>
+          <button data-suunta="0,1" aria-label="Down">▼</button>
+        </div>
+        <button class="iso" data-toiminto="ability">Ability</button>
+      </div>
+      <div class="alarivi">
+        <div class="pikaohje">
+          <span><kbd>←↑↓→</kbd>/<kbd>WASD</kbd> move and attack</span>
+          <span><kbd>Space</kbd> wait · stairs · spring</span>
+          <span><kbd>Q</kbd> ability</span>
+          <span><kbd>1</kbd>–<kbd>9</kbd> use</span>
+          <span><kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> drop</span>
+        </div>
+        <div class="kohta" id="kohta"></div>
+      </div>
+      <div class="peite" id="peite" hidden></div>
+    </section>
+
+    <section class="ruutu loki-ruutu">
+      <h2>Events</h2>
+      <ol class="loki" id="loki" aria-live="polite"></ol>
+    </section>
+
+    <section class="ruutu nakyvissa-ruutu">
+      <h2>In view</h2>
+      <div id="nakyvissa"></div>
+    </section>
+
+    <aside class="sivu">
+      <section class="ruutu">
+        <h2>Character</h2>
+        <div id="hahmo"></div>
+      </section>
+      <section class="ruutu">
+        <h2>Equipment</h2>
+        <div id="varusteet"></div>
+      </section>
+      <section class="ruutu">
+        <h2>Pack</h2>
+        <ol class="reppu" id="reppu"></ol>
+      </section>
+      <section class="ruutu">
+        <h2>Legend</h2>
+        <div class="merkit" id="merkit"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script src="peli.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vaskivuori;
+  const T = V.T;
+  const $ = s => document.querySelector(s);
+  const el = {
+    ruutu: $('#kartta-ruutu'), kartta: $('#kartta'), peite: $('#peite'), kohta: $('#kohta'),
+    loki: $('#loki'), nakyvissa: $('#nakyvissa'), hahmo: $('#hahmo'), varusteet: $('#varusteet'),
+    reppu: $('#reppu'), merkit: $('#merkit'), kerros: $('#kerros'), lukot: $('#lukot'),
+  };
+
+  const NAMES = ['Aino', 'Väinö', 'Kyllikki', 'Ilmari', 'Marjatta', 'Kalervo', 'Annikki', 'Tellervo', 'Antero', 'Mielikki', 'Untamo', 'Lemmikki'];
+  const LINE_HEIGHT = 1.2;
+
+  const TERRAIN = [];
+  TERRAIN[T.ROCK] = [' ', ''];
+  TERRAIN[T.FLOOR] = ['.', 't-f'];
+  TERRAIN[T.CORR] = ['#', 't-c'];
+  TERRAIN[T.WALL_H] = ['-', 't-w'];
+  TERRAIN[T.WALL_V] = ['|', 't-w'];
+  TERRAIN[T.DOOR] = ['+', 't-d'];
+  TERRAIN[T.STAIRS] = ['>', 't-s'];
+  TERRAIN[T.SPRING] = ['{', 't-l'];
+  TERRAIN[T.DRY] = ['{', 't-k'];
+
+  const TERRAIN_NAME = {
+    [T.FLOOR]: 'floor', [T.CORR]: 'corridor', [T.WALL_H]: 'rock wall', [T.WALL_V]: 'rock wall',
+    [T.DOOR]: 'doorway', [T.STAIRS]: 'Stairs down', [T.SPRING]: 'Sacred spring', [T.DRY]: 'dried-up spring',
+  };
+
+  const LEGEND = [
+    ['@', 'pl pl-urho', 'you'],
+    ['>', 't-s', 'stairs down'],
+    ['{', 't-l', 'sacred spring'],
+    ['+', 't-d', 'doorway'],
+    ['#', 't-c', 'corridor'],
+    ['$', 'i i-silver', 'silver'],
+    [')', 'i i-weapon', 'weapon'],
+    ['[', 'i i-armor', 'armor'],
+    ['%', 'i i-food', 'food'],
+    ['!', 'i i-mesivoide', 'potion'],
+    ['?', 'i i-scroll', 'scroll'],
+    ['(', 'i i-arrows', 'arrows'],
+    ['a–z', 'm m-hiisi', 'creatures'],
+    ['&', 'i i-sampo', 'Sampo'],
+  ];
+
+  let game = null;
+  let mode = 'luonti';
+  let lastName = '';
+  let travel = null;
+  let blockRepeat = false;
+  let endShownAt = 0;
+  let charRatio = 0.6;
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const itemClass = id => `i i-${V.ITEMS[id].kind} i-${id}`;
+  const randomName = () => NAMES[Math.floor(Math.random() * NAMES.length)];
+
+  // Hirviöiden värit tulevat pelilogiikan taulukosta.
+  const style = document.createElement('style');
+  style.textContent = Object.entries(V.MONSTERS).map(([id, m]) => `.m-${id}{color:${m.color}}`).join('\n');
+  document.head.appendChild(style);
+
+  // --- piirto ---------------------------------------------------------------
+
+  const wrap = (cls, s) => (cls ? `<span class="${cls}">${esc(s)}</span>` : esc(s));
+
+  function threats() {
+    return game ? V.visibleMonsters(game).filter(m => !m.asleep).length : 0;
+  }
+
+  function renderMap() {
+    const W = V.W, H = V.H;
+    if (!game) {
+      el.kartta.textContent = Array(H).fill(' '.repeat(W)).join('\n');
+      return;
+    }
+    const g = game, p = g.player;
+    const mons = new Map();
+    for (const m of g.monsters) {
+      const i = m.y * W + m.x;
+      if (g.vis[i]) mons.set(i, m);
+    }
+    const target = p.cls !== 'urho' && !g.over ? V.nearestTarget(g) : null;
+    const rows = [];
+    for (let y = 0; y < H; y++) {
+      let row = '', cur = null, buf = '';
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        let ch = ' ', cls = '';
+        if (x === p.x && y === p.y) {
+          ch = '@';
+          cls = 'pl pl-' + p.cls + (p.raivo > 0 ? ' raivo' : '');
+        } else if (mons.has(i)) {
+          const m = mons.get(i);
+          ch = V.MONSTERS[m.id].ch;
+          cls = 'm m-' + m.id + (m === target ? ' kohde' : '') + (m.asleep ? ' uni' : '');
+        } else if (g.seen[i]) {
+          const it = g.items.get(i);
+          if (it) {
+            ch = V.ITEMS[it.id].ch;
+            cls = itemClass(it.id);
+          } else {
+            [ch, cls] = TERRAIN[g.map[i]];
+          }
+          if (cls && !g.vis[i]) cls += ' mem';
+        }
+        if (cls !== cur) {
+          row += wrap(cur, buf);
+          cur = cls;
+          buf = '';
+        }
+        buf += ch;
+      }
+      rows.push(row + wrap(cur, buf));
+    }
+    el.kartta.innerHTML = rows.join('\n');
+    centerOnPlayer();
+  }
+
+  // Kapealla näytöllä kartta on leveämpi kuin ruutu: pidetään pelaaja näkyvissä.
+  function centerOnPlayer() {
+    const frame = el.kartta.parentElement;
+    if (!game || frame.scrollWidth <= frame.clientWidth) return;
+    const cellW = el.kartta.offsetWidth / V.W;
+    frame.scrollLeft = (game.player.x + 0.5) * cellW - frame.clientWidth / 2;
+  }
+
+  function renderHeader() {
+    const depth = game ? game.depth : 0;
+    el.kerros.innerHTML = game
+      ? `Floor <b>${depth}/${V.MAX_DEPTH}</b> · ${esc(V.FLOOR_NAMES[depth - 1])}`
+      : 'Nine locks, ten floors';
+    let locks = '';
+    for (let k = 1; k <= V.MAX_DEPTH; k++) {
+      const cls = k < depth ? 'auki' : k === V.MAX_DEPTH ? 'louhi' : '';
+      locks += `<i class="${cls}" title="${k === V.MAX_DEPTH ? "Louhi's Chamber" : 'Lock ' + k}"></i>`;
+    }
+    el.lukot.innerHTML = locks;
+  }
+
+  function renderLog(fromIndex) {
+    if (!game) {
+      el.loki.innerHTML = '<li>Create a character to begin the adventure.</li>';
+      return;
+    }
+    const log = game.log;
+    const start = Math.max(0, log.length - 8);
+    let html = '';
+    for (let k = start; k < log.length; k++) {
+      const e = log[k];
+      const fresh = k >= fromIndex;
+      html += `<li class="${fresh ? 'uusi ' + e.kind : ''}">${esc(e.text)}</li>`;
+    }
+    el.loki.innerHTML = html;
+  }
+
+  function meter(label, cls, pct, text) {
+    pct = Math.max(0, Math.min(100, pct));
+    return `<div class="mittari ${cls}"><span class="m-nimi">${label}</span>` +
+      `<span class="palkki"><i style="width:${pct}%"></i></span><span class="m-arvo">${text}</span></div>`;
+  }
+
+  function renderHahmo() {
+    if (!game) {
+      el.hahmo.innerHTML = '<p class="tyhja-teksti">Enter a name and choose a class.</p>';
+      return;
+    }
+    const g = game, p = g.player, c = V.classOf(p);
+    const base = V.XP_TABLE[p.level - 1], next = V.XP_TABLE[p.level];
+    const danger = !g.over && p.hp <= p.maxHp * 0.3;
+    let h = `<div class="nimirivi"><b>${esc(p.name)}</b><span>${c.name} · level ${p.level}</span></div>`;
+    h += meter('HP', 'hp' + (danger ? ' vaara' : ''), (p.hp / p.maxHp) * 100, `${p.hp}/${p.maxHp}`);
+    if (p.maxMana) h += meter('Mana', 'mana', (p.mana / p.maxMana) * 100, `${p.mana}/${p.maxMana}`);
+    h += meter('XP', 'xp', ((p.xp - base) / (next - base)) * 100, `${p.xp}/${next}`);
+
+    const def = V.ITEMS[p.armor.id].def;
+    const stats = [
+      ['Strength', p.voima],
+      ['Armor', p.shield > 0 ? `${def}+4` : def],
+      ['Silver', p.silver],
+      ['Kills', p.kills],
+      ['Turn', g.turn],
+      p.cls === 'eramies' ? ['Arrows', p.arrows] : ['Deepest', `${g.maxDepth}/${V.MAX_DEPTH}`],
+    ];
+    if (p.cls === 'eramies') stats.push(['Dodge', `${V.dodge(p)}%`]);
+    h += '<dl class="arvot">' + stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('') + '</dl>';
+
+    const effects = [];
+    if (p.raivo > 0) effects.push(`<span class="tila">Rage: ${p.raivo} turns</span>`);
+    if (p.shield > 0) effects.push(`<span class="tila">Shield spell: ${p.shield} turns</span>`);
+    if (danger) effects.push('<span class="tila odota" style="color:var(--paha)">Low on health – eat or drink something!</span>');
+    h += `<div class="tilat">${effects.join('')}</div>`;
+
+    const ab = V.abilityInfo(g);
+    h += `<button class="kyky${ab.ready ? '' : ' ei-valmis'}" data-toiminto="ability" title="${esc(c.abilityDesc)}">` +
+      `<kbd>Q</kbd><span><b>${ab.name}</b><small>${esc(ab.text)}</small></span></button>`;
+    el.hahmo.innerHTML = h;
+  }
+
+  function renderVarusteet() {
+    if (!game) {
+      el.varusteet.innerHTML = '<p class="tyhja-teksti">—</p>';
+      return;
+    }
+    const p = game.player;
+    const w = V.ITEMS[p.weapon.id], a = V.ITEMS[p.armor.id];
+    const [lo, hi] = V.dmgRange(p);
+    const spell = p.cls === 'tietaja' && w.spell ? `, spell +${w.spell}` : '';
+    el.varusteet.innerHTML =
+      `<div class="varuste" title="Weapon damage ${w.min}–${w.max} + ${lo - w.min} from strength">` +
+        `<span class="lj">Weapon</span><span class="g i-weapon">)</span><span class="vn">${w.name}</span><small>hit ${lo}–${hi}${spell}</small></div>` +
+      `<div class="varuste"><span class="lj">Armor</span><span class="g i-armor">[</span><span class="vn">${a.name}</span><small>armor ${a.def}</small></div>`;
+  }
+
+  function renderReppu() {
+    const p = game && game.player;
+    let html = '';
+    for (let s = 0; s < V.PACK_SIZE; s++) {
+      const it = p && p.pack[s];
+      if (!it) {
+        html += `<li class="tyhja"><kbd>${s + 1}</kbd><span class="g"></span><span>—</span><small></small><span></span><span></span></li>`;
+        continue;
+      }
+      const d = V.ITEMS[it.id];
+      const cmp = V.compareItem(it, p);
+      const arrow = cmp > 0 ? '<span class="vert parempi" title="Better than current">▲</span>'
+        : cmp < 0 ? '<span class="vert huonompi" title="Worse than current">▼</span>' : '<span></span>';
+      html += `<li data-slot="${s}" title="Use: ${s + 1} · Drop: Shift+${s + 1}">` +
+        `<kbd>${s + 1}</kbd><span class="g ${itemClass(it.id)}">${esc(d.ch)}</span>` +
+        `<span class="vn">${esc(V.itemLabel(it))}</span><small>${esc(V.itemInfo(it, p))}</small>${arrow}` +
+        `<button class="hylkaa" data-hylkaa="${s}" aria-label="Drop ${esc(d.name)}">×</button></li>`;
+    }
+    el.reppu.innerHTML = html;
+  }
+
+  function describeMonster(m) {
+    const d = V.MONSTERS[m.id];
+    return `${d.name} (${m.hp}/${m.maxHp} HP${m.asleep ? ', asleep' : ''})`;
+  }
+
+  function renderNakyvissa() {
+    if (!game) {
+      el.nakyvissa.innerHTML = '<p class="tyhja-teksti">Nearby creatures and items appear here.</p>';
+      return;
+    }
+    const g = game, p = g.player, W = V.W;
+    let html = '';
+
+    const here = p.y * W + p.x;
+    const underItem = g.items.get(here);
+    const underTerrain = g.map[here];
+    if (underItem) {
+      const why = V.compareItem(underItem, p) <= 0 && ['weapon', 'armor'].includes(V.ITEMS[underItem.id].kind)
+        ? 'your current one is better' : 'your pack is full';
+      html += `<div class="jalat">Underfoot: <b>${esc(V.itemLabel(underItem))}</b> – ${why}. ` +
+        'Take it by dropping something in its place (<kbd>Shift</kbd>+number).</div>';
+    } else if (underTerrain === T.STAIRS) {
+      html += '<div class="jalat">Underfoot: <b>Stairs down</b> – <kbd>Space</kbd> to descend</div>';
+    } else if (underTerrain === T.SPRING) {
+      html += '<div class="jalat">Underfoot: <b>Sacred spring</b> – <kbd>Space</kbd> to drink</div>';
+    }
+
+    const rows = [];
+    const target = p.cls !== 'urho' ? V.nearestTarget(g) : null;
+    for (const m of V.visibleMonsters(g)) {
+      const d = V.MONSTERS[m.id];
+      const tags = (m === target ? '<em class="tag kohde-tag">target</em>' : '') + (m.asleep ? '<em class="tag">asleep</em>' : '');
+      rows.push(`<li><span class="g m m-${m.id}">${esc(d.ch)}</span><span class="ln">${d.name}</span>` +
+        `<span class="minipalkki"><i style="width:${(m.hp / m.maxHp) * 100}%"></i></span><small>${m.hp}/${m.maxHp}</small>${tags}</li>`);
+    }
+
+    const counted = new Map();
+    let stairs = null, spring = null;
+    for (let i = 0; i < g.map.length; i++) {
+      if (!g.seen[i] || i === here) continue;
+      const x = i % W, y = (i - x) / W;
+      const it = g.items.get(i);
+      if (it && g.vis[i]) {
+        const e = counted.get(it.id) || { it, n: 0, x, y };
+        e.n++;
+        counted.set(it.id, e);
+      }
+      if (g.map[i] === T.STAIRS) stairs = { x, y, vis: g.vis[i] };
+      if (g.map[i] === T.SPRING) spring = { x, y, vis: g.vis[i] };
+    }
+    for (const e of counted.values()) {
+      const d = V.ITEMS[e.it.id];
+      const label = d.kind === 'silver' ? 'Silver' : d.kind === 'arrows' ? 'Arrows' : d.name;
+      rows.push(`<li data-x="${e.x}" data-y="${e.y}" title="Click to walk there"><span class="g ${itemClass(e.it.id)}">${esc(d.ch)}</span>` +
+        `<span class="ln">${label}${e.n > 1 ? ` ×${e.n}` : ''}</span></li>`);
+    }
+    if (spring) {
+      rows.push(`<li data-x="${spring.x}" data-y="${spring.y}" title="Click to walk there"><span class="g t-l">{</span>` +
+        `<span class="ln">Sacred spring</span>${spring.vis ? '' : '<em class="tag">remembered</em>'}</li>`);
+    }
+    if (stairs) {
+      rows.push(`<li data-x="${stairs.x}" data-y="${stairs.y}" title="Click to walk there"><span class="g t-s">&gt;</span>` +
+        `<span class="ln">Stairs down</span>${stairs.vis ? '' : '<em class="tag">remembered</em>'}</li>`);
+    }
+
+    html += rows.length ? `<ul class="lista">${rows.join('')}</ul>` : '<p class="tyhja-teksti">Nothing in particular.</p>';
+    el.nakyvissa.innerHTML = html;
+  }
+
+  function renderMerkit() {
+    el.merkit.innerHTML = LEGEND.map(([ch, cls, name]) =>
+      `<span><span class="${cls}" style="display:inline-block;width:4ch">${esc(ch)}</span>${name}</span>`).join('');
+  }
+
+  function render(fromLog) {
+    renderHeader();
+    renderMap();
+    renderLog(fromLog);
+    renderHahmo();
+    renderVarusteet();
+    renderReppu();
+    renderNakyvissa();
+  }
+
+  // --- kartan skaalaus ------------------------------------------------------
+
+  function measureFont() {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = `100px ${getComputedStyle(el.kartta).fontFamily}`;
+    charRatio = ctx.measureText('M'.repeat(10)).width / 1000;
+  }
+
+  function fitMap() {
+    const cs = getComputedStyle(el.ruutu);
+    const availW = el.ruutu.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+    let size = availW / (V.W * charRatio);
+    if (window.innerWidth > 1020) {
+      const other = document.querySelector('.ylapalkki').offsetHeight + document.querySelector('.loki-ruutu').offsetHeight;
+      const chrome = el.ruutu.offsetHeight - el.kartta.offsetHeight;
+      const availH = window.innerHeight - other - chrome - 44;
+      size = Math.min(size, availH / (V.H * LINE_HEIGHT));
+    }
+    // Puhelimessa koko kartta ei mahdu luettavana, joten se saa vieriä sivusuunnassa.
+    const minSize = window.innerWidth <= 640 ? 11 : 6;
+    size = Math.max(minSize, Math.min(22, Math.floor(size * 10) / 10));
+    el.kartta.style.fontSize = size + 'px';
+    centerOnPlayer();
+  }
+
+  // --- pelin kulku ----------------------------------------------------------
+
+  function doAct(action) {
+    if (!game || game.over) return { spent: false };
+    const before = { log: game.log.length, hp: game.player.hp, threats: threats(), depth: game.depth };
+    const spent = V.act(game, action);
+    if (game.player.hp < before.hp || threats() > before.threats || game.depth !== before.depth) blockRepeat = true;
+    render(before.log);
+    if (game.over) finish();
+    return { spent, logged: game.log.length > before.log };
+  }
+
+  function stopTravel() {
+    if (travel) clearTimeout(travel.timer);
+    travel = null;
+  }
+
+  function goTo(x, y) {
+    stopTravel();
+    if (mode !== 'peli') return;
+    const p = game.player, dx = x - p.x, dy = y - p.y;
+    if (dx === 0 && dy === 0) { doAct({ type: 'action' }); return; }
+    if (Math.abs(dx) + Math.abs(dy) === 1) { doAct({ type: 'move', dx, dy }); return; }
+    const steps = V.pathTo(game, x, y);
+    if (!steps) return;
+    travel = { steps, i: 0, timer: 0 };
+    travelStep();
+  }
+
+  // Kävely pysähtyy, jos jotain tapahtuu: vihollinen näkyviin, osuma tai uusi viesti.
+  function travelStep() {
+    if (!travel) return;
+    const [dx, dy] = travel.steps[travel.i++];
+    const res = doAct({ type: 'move', dx, dy });
+    if (!travel) return;
+    if (!res.spent || res.logged || game.over || threats() > 0 || travel.i >= travel.steps.length) {
+      travel = null;
+      return;
+    }
+    travel.timer = setTimeout(travelStep, 45);
+  }
+
+  function cellFromEvent(ev) {
+    const r = el.kartta.getBoundingClientRect();
+    const x = Math.floor(((ev.clientX - r.left) / r.width) * V.W);
+    const y = Math.floor(((ev.clientY - r.top) / r.height) * V.H);
+    return x >= 0 && y >= 0 && x < V.W && y < V.H ? { x, y } : null;
+  }
+
+  function describeCell(c) {
+    if (!game || !c) return '';
+    const g = game, i = c.y * V.W + c.x;
+    if (c.x === g.player.x && c.y === g.player.y) return `@ ${g.player.name} (you)`;
+    if (!g.seen[i]) return '';
+    const m = g.vis[i] && g.monsters.find(o => o.x === c.x && o.y === c.y);
+    if (m) return `${V.MONSTERS[m.id].ch} ${describeMonster(m)}`;
+    const it = g.items.get(i);
+    if (it) return `${V.ITEMS[it.id].ch} ${V.itemLabel(it)}` + (V.itemInfo(it, g.player) ? ` – ${V.itemInfo(it, g.player)}` : '');
+    const name = TERRAIN_NAME[g.map[i]];
+    return name ? `${TERRAIN[g.map[i]][0]} ${name}` : '';
+  }
+
+  function finish() {
+    stopTravel();
+    mode = 'loppu';
+    endShownAt = performance.now();
+    const g = game, p = g.player, c = V.classOf(p);
+    const center = (s, w) => {
+      s = String(s).slice(0, w);
+      const left = Math.floor((w - s.length) / 2);
+      return ' '.repeat(left) + s + ' '.repeat(w - s.length - left);
+    };
+    let art, title, text;
+    if (g.won) {
+      art = `<pre class="sampokuva">${esc([
+        '      *    .    *    .    *',
+        '   .    .-==========-.    .',
+        '        |  S A M P O |',
+        '  *     |  (\\ ** /)  |     *',
+        '        \'-==========-\'',
+        '     .     //||||\\\\     .',
+      ].join('\n'))}</pre>`;
+      title = '<h2 class="voitto">The Sampo is yours!</h2>';
+      text = `${esc(p.name)} defeated Louhi and carries the bright-lidded Sampo back home. Fortune returns to the people.`;
+    } else {
+      const inner = 19;
+      art = `<pre class="hauta">${esc([
+        '        _______________',
+        '       /               \\',
+        `      /${center('REST', inner - 2)}\\`,
+        `     /${center('IN PEACE', inner)}\\`,
+        `    |${center('', inner + 2)}|`,
+        `    |${center(p.name, inner + 2)}|`,
+        `    |${center(c.name + ', level ' + p.level, inner + 2)}|`,
+        `    |${center('floor ' + g.depth, inner + 2)}|`,
+        `    |${center('killed by:', inner + 2)}|`,
+        `    |${center(g.cause, inner + 2)}|`,
+        `  __|${'_'.repeat(inner + 2)}|__`,
+      ].join('\n'))}</pre>`;
+      title = '<h2 class="kuolema">You died</h2>';
+      text = `${esc(p.name)} fell on floor ${g.depth}. The copper mountain still keeps the Sampo hidden.`;
+    }
+    el.peite.className = 'peite loppu-peite';
+    el.peite.innerHTML =
+      `<div class="loppu">${art}${title}<p>${text}</p>` +
+      '<dl class="tulos">' +
+        `<dt>Level</dt><dd>${p.level}</dd>` +
+        `<dt>Deepest floor</dt><dd>${g.maxDepth}/${V.MAX_DEPTH}</dd>` +
+        `<dt>Enemies slain</dt><dd>${p.kills}</dd>` +
+        `<dt>Silver</dt><dd>${p.silver}</dd>` +
+        `<dt>Turns</dt><dd>${g.turn}</dd>` +
+        `<dt class="pisteet">Score</dt><dd class="pisteet">${V.score(g)}</dd>` +
+      '</dl>' +
+      '<button class="uusi-peli" id="uusi-peli"><kbd>Enter</kbd> New game</button></div>';
+    el.peite.hidden = false;
+    $('#uusi-peli').addEventListener('click', showCreation);
+  }
+
+  function classCard(c, n) {
+    const w = V.ITEMS[c.weapon], a = V.ITEMS[c.armor];
+    const extras = c.items.map(([id, k]) => V.ITEMS[id].name + (k > 1 ? ` ×${k}` : '')).join(', ');
+    const res = c.mana ? ` · Mana ${c.mana}` : c.arrows ? ` · Arrows ${c.arrows}` : '';
+    return `<button class="luokka" data-luokka="${c.id}">` +
+      `<span class="luokka-otsikko"><kbd>${n}</kbd><b>${c.name}</b><span class="g pl pl-${c.id}">@</span></span>` +
+      `<span class="arvorivi">HP ${c.hp} · Strength ${c.voima} · Armor ${a.def}${res}</span>` +
+      `<p>${esc(c.desc)}</p>` +
+      `<p class="kykyteksti"><b>${c.abilityName}:</b> ${esc(c.abilityDesc)}</p>` +
+      `<p class="alku">Carrying: ${esc(w.name)}, ${esc(a.name)}, ${esc(extras)}</p>` +
+      '</button>';
+  }
+
+  function showCreation() {
+    stopTravel();
+    mode = 'luonti';
+    game = null;
+    el.ruutu.classList.add('luodaan');
+    el.peite.className = 'peite luonti-peite';
+    el.peite.innerHTML =
+      '<div class="luonti">' +
+      `<pre class="vuori" aria-hidden="true">${esc([
+        '                 /\\',
+        '        /\\      /  \\      /\\',
+        '       /  \\    / /\\ \\    /  \\',
+        '      / /\\ \\  / /  \\ \\  /    \\',
+        '     /_/__\\_\\/_/_[]_\\_\\/______\\',
+      ].join('\n'))}</pre>` +
+      '<h2>Copper Mountain</h2>' +
+      '<p class="tarina">Louhi, mistress of Pohjola, has hidden the Sampo in the belly of the copper mountain, behind nine locks. ' +
+      'Descend ten floors into the depths of the mountain, defeat Louhi and bring the Sampo back.</p>' +
+      '<label class="nimikentta">Your name <input id="nimi" maxlength="16" autocomplete="off" spellcheck="false"></label>' +
+      `<div class="luokat">${V.CLASSES.map((c, k) => classCard(c, k + 1)).join('')}</div>` +
+      '<p class="vihje">Enter a name and choose a class: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> or click a card.</p>' +
+      '</div>';
+    el.peite.hidden = false;
+    el.peite.querySelectorAll('[data-luokka]').forEach(b => b.addEventListener('click', () => start(b.dataset.luokka)));
+    const input = $('#nimi');
+    input.value = lastName || randomName();
+    input.focus();
+    input.select();
+    render(0);
+  }
+
+  function start(classId) {
+    const input = $('#nimi');
+    const name = ((input && input.value.trim()) || randomName()).slice(0, 16);
+    lastName = name;
+    game = V.newGame(name, classId);
+    mode = 'peli';
+    blockRepeat = true;
+    el.ruutu.classList.remove('luodaan');
+    el.peite.hidden = true;
+    el.peite.innerHTML = '';
+    render(0);
+    fitMap();
+    window.scrollTo(0, 0);
+  }
+
+  // --- syötteet -------------------------------------------------------------
+
+  const MOVE = {
+    ArrowUp: [0, -1], KeyW: [0, -1], Numpad8: [0, -1],
+    ArrowDown: [0, 1], KeyS: [0, 1], Numpad2: [0, 1],
+    ArrowLeft: [-1, 0], KeyA: [-1, 0], Numpad4: [-1, 0],
+    ArrowRight: [1, 0], KeyD: [1, 0], Numpad6: [1, 0],
+  };
+  const ACTION_KEYS = new Set(['Space', 'Enter', 'NumpadEnter', 'Numpad5', 'Period']);
+
+  // Fyysinen näppäin (e.code) toimii näppäimistöasettelusta riippumatta; e.key on varalla, jos code puuttuu.
+  function keyCode(e) {
+    if (e.code) return e.code;
+    const k = e.key || '';
+    if (/^[1-9]$/.test(k)) return 'Digit' + k;
+    if (/^[a-zåäö]$/i.test(k)) return 'Key' + k.toUpperCase();
+    if (k === ' ') return 'Space';
+    if (k === '.') return 'Period';
+    return k;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const code = keyCode(e);
+
+    if (mode === 'luonti') {
+      const m = /^(?:Digit|Numpad)([1-3])$/.exec(code);
+      if (m) {
+        e.preventDefault();
+        start(V.CLASSES[+m[1] - 1].id);
+      }
+      return;
+    }
+
+    if (mode === 'loppu') {
+      if (code === 'Enter' || code === 'NumpadEnter') {
+        e.preventDefault();
+        // Viive estää ohittamasta loppuruutua vahingossa kesken näppäilyn.
+        if (!e.repeat && performance.now() - endShownAt > 700) showCreation();
+      } else if (MOVE[code] || ACTION_KEYS.has(code)) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    let action = null;
+    if (MOVE[code]) action = { type: 'move', dx: MOVE[code][0], dy: MOVE[code][1] };
+    else if (ACTION_KEYS.has(code)) action = { type: 'action' };
+    else if (code === 'KeyQ') action = { type: 'ability' };
+    else if (/^Digit[1-9]$/.test(code)) action = { type: e.shiftKey ? 'drop' : 'use', slot: +code.slice(5) - 1 };
+    if (!action) return;
+
+    e.preventDefault();
+    stopTravel();
+    if (e.repeat && (blockRepeat || action.type === 'use' || action.type === 'drop' || action.type === 'ability')) return;
+    doAct(action);
+  });
+
+  document.addEventListener('keyup', () => { blockRepeat = false; });
+
+  el.kartta.addEventListener('click', ev => {
+    const c = cellFromEvent(ev);
+    if (c) goTo(c.x, c.y);
+  });
+  el.kartta.addEventListener('mousemove', ev => { el.kohta.textContent = describeCell(cellFromEvent(ev)); });
+  el.kartta.addEventListener('mouseleave', () => { el.kohta.textContent = ''; });
+
+  document.addEventListener('click', ev => {
+    if (mode !== 'peli') return;
+    const drop = ev.target.closest('[data-hylkaa]');
+    if (drop) { stopTravel(); doAct({ type: 'drop', slot: +drop.dataset.hylkaa }); return; }
+    const slot = ev.target.closest('[data-slot]');
+    if (slot) { stopTravel(); doAct({ type: 'use', slot: +slot.dataset.slot }); return; }
+    const dir = ev.target.closest('[data-suunta]');
+    if (dir) { stopTravel(); const [dx, dy] = dir.dataset.suunta.split(',').map(Number); doAct({ type: 'move', dx, dy }); return; }
+    const act = ev.target.closest('[data-toiminto]');
+    if (act) { stopTravel(); doAct({ type: act.dataset.toiminto }); return; }
+    const spot = ev.target.closest('[data-x]');
+    if (spot) goTo(+spot.dataset.x, +spot.dataset.y);
+  });
+
+  window.addEventListener('resize', fitMap);
+
+  renderMerkit();
+  measureFont();
+  showCreation();
+  fitMap();
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { measureFont(); fitMap(); });
+  }
+})();
+</script>
+</body>
+</html>

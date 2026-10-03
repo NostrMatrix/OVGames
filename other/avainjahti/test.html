@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>btc.js – test vectors</title>
+<style>
+  body { background:#0a0a0a; color:#eee; font:13px/1.6 ui-monospace,Consolas,monospace; padding:24px; }
+  .ok { color:#7ddf64; }
+  .fail { color:#ff5a3c; }
+  h1 { font-size:15px; color:#ff7a00; letter-spacing:.08em; }
+  pre { margin:0; white-space:pre-wrap; }
+  #sum { margin-top:16px; font-size:15px; }
+</style>
+</head>
+<body>
+<h1>btc.js – TEST VECTORS</h1>
+<pre id="out"></pre>
+<div id="sum"></div>
+<script src="btc.js"></script>
+<script>
+(async function () {
+  var out = document.getElementById('out');
+  var fails = 0;
+  function eq(name, got, want) {
+    var pass = got === want;
+    if (!pass) fails++;
+    out.innerHTML += '<span class="' + (pass ? 'ok' : 'fail') + '">' +
+      (pass ? 'ok   ' : 'FAIL ') + name + '</span>\n' +
+      (pass ? '' : '       got  ' + got + '\n       want ' + want + '\n');
+  }
+  var hex = BTC.bytesToHex;
+  var enc = function (s) { return new TextEncoder().encode(s); };
+
+  // SHA-256 ristiin WebCryptoa vastaan, satunnaisilla pituuksilla
+  var shaOk = true;
+  for (var i = 0; i < 200 && shaOk; i++) {
+    var buf = new Uint8Array(Math.floor(Math.random() * 200));
+    crypto.getRandomValues(buf);
+    var want = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)));
+    if (hex(BTC.sha256(buf)) !== want) shaOk = false;
+  }
+  eq('sha256 vs WebCrypto (200 random inputs)', shaOk, true);
+
+  eq('sha256("")', hex(BTC.sha256(new Uint8Array(0))),
+     'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  eq('sha256("abc")', hex(BTC.sha256(enc('abc'))),
+     'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  eq('sha256(56 bytes, block boundary)', hex(BTC.sha256(enc('a'.repeat(56)))),
+     'b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a');
+  eq('ripemd160("")', hex(BTC.ripemd160(new Uint8Array(0))),
+     '9c1185a5c5e9fc54612808977ee8f548b2258d31');
+  eq('ripemd160("abc")', hex(BTC.ripemd160(enc('abc'))),
+     '8eb208f7e05d987a9b044a8e98c6b087f15a0bfc');
+  eq('ripemd160("message digest")', hex(BTC.ripemd160(enc('message digest'))),
+     '5d0689ef49d2fae572b881b123a85ffa21595f36');
+  eq('ripemd160(a-z)', hex(BTC.ripemd160(enc('abcdefghijklmnopqrstuvwxyz'))),
+     'f71c27109c692c1b56bbdceb5b9d2865b3708dbc');
+
+  var one = BTC.deriveKey(1n);
+  eq('k=1 pubkey (compressed)', one.pubHex,
+     '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798');
+  eq('k=1 hash160', one.hash160, '751e76e8199196d454941c45d1b3a323f1433bd6');
+  eq('k=1 legacy', one.legacy, '1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH');
+  eq('k=1 bech32 (BIP173)', one.bech32, 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4');
+  eq('k=1 WIF', one.wif, 'KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn');
+
+  var two = BTC.deriveKey(2n);
+  eq('k=2 pubkey (compressed)', two.pubHex,
+     '02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5');
+  eq('k=2 legacy', two.legacy, '1cMh228HTCiwS8ZsaakH8A8wze1JR5ZsP');
+
+  var three = BTC.deriveKey(3n);
+  eq('k=3 pubkey (compressed)', three.pubHex,
+     '02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9');
+
+  // secp256k1 ryhmalaki: G*(n-1) = -G, eli sama x, vastakkainen y-pariteetti
+  var last = BTC.publicKey(BTC.N - 1n);
+  eq('G*(n-1) x == G x', hex(last).slice(2), one.pubHex.slice(2));
+  eq('G*(n-1) y parity flips', hex(last).slice(0, 2), '03');
+
+  // Mastering Bitcoin -kirjan esimerkkiavain
+  var mb = BTC.deriveKey(0x1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aeddn);
+  eq('MB pubkey', mb.pubHex,
+     '03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a');
+  eq('MB WIF', mb.wif, 'KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ');
+
+  eq('base58check(version 0 + 20 zero bytes)', BTC.p2pkhAddress(new Uint8Array(20)),
+     '1111111111111111111114oLvT2');
+
+  // Muoto- ja pituustarkistukset satunnaisavaimilla
+  var shapeOk = true;
+  for (var j = 0; j < 25; j++) {
+    var k = BTC.deriveKey();
+    if (!/^1[1-9A-HJ-NP-Za-km-z]{25,33}$/.test(k.legacy)) shapeOk = false;
+    if (!/^bc1q[02-9ac-hj-np-z]{38}$/.test(k.bech32)) shapeOk = false;
+    if (!/^[KL][1-9A-HJ-NP-Za-km-z]{51}$/.test(k.wif)) shapeOk = false;
+    if (k.privHex.length !== 64) shapeOk = false;
+  }
+  eq('25 random keys: address/WIF formats valid', shapeOk, true);
+
+  // Suorituskyky
+  var t0 = performance.now();
+  for (var m = 0; m < 30; m++) BTC.deriveKey();
+  var ms = performance.now() - t0;
+  out.innerHTML += '\n30 keys: ' + ms.toFixed(1) + ' ms (' + (ms / 30).toFixed(2) + ' ms/key)\n';
+
+  var sum = document.getElementById('sum');
+  sum.className = fails === 0 ? 'ok' : 'fail';
+  sum.textContent = fails === 0 ? 'ALL TESTS OK' : fails + ' TESTS FAILED';
+  document.title = (fails === 0 ? 'OK' : 'FAIL ' + fails) + ' – btc.js';
+})();
+</script>
+</body>
+</html>

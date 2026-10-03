@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beat Meter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Doto:wght@600..900&display=swap">
+<style>
+  /* Yksi tumma ilme riippumatta käyttöjärjestelmän teemasta */
+  :root {
+    --bg: #09090A;
+    --panel: #111214;
+    --field: #17191C;
+    --line: #25282C;
+    --line-strong: #3B4046;
+    --text: #ECEAE5;
+    --text-2: #8E939A;
+    --amber: #FFB020;
+    --amber-dim: #2A1D05;
+    --amber-halo: rgb(255 176 32 / .35);
+    --red: #FF3B2F;
+    --danger: #FF7A6E;
+    --led-font: "Doto", "Courier New", ui-monospace, monospace;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+  ::selection { background: rgb(255 176 32 / .3); color: var(--text); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  .app {
+    max-width: 980px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 20px 36px;
+  }
+  @media (min-width: 600px) {
+    .app { padding-inline: 28px; padding-block: 28px 44px; }
+  }
+
+  .top {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .brand {
+    margin: 0;
+    font-family: var(--led-font);
+    font-weight: 900;
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: .02em;
+  }
+  .kicker {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--text-2);
+  }
+
+  /* ---------- LED-näyttö ---------- */
+  .display {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 16px 16px 20px;
+    border: 1px solid #1E2125;
+    border-radius: 18px;
+    background:
+      radial-gradient(circle, #16171A 0.8px, transparent 1.2px) 0 0 / 7px 7px,
+      #000;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .03), 0 24px 60px rgb(0 0 0 / .55);
+  }
+  @media (min-width: 600px) {
+    .display { padding: 22px 28px 28px; gap: 30px; }
+  }
+
+  .status {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-family: var(--led-font);
+    font-weight: 800;
+    font-size: 17px;
+    line-height: 1.1;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .status .marking {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--amber);
+    text-shadow: 0 0 10px var(--amber-halo);
+  }
+  .status .marking small {
+    font-family: "Barlow", system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: .02em;
+    text-transform: none;
+    color: var(--text-2);
+    text-shadow: none;
+  }
+  .status .readout {
+    margin: 0;
+    display: flex;
+    gap: 16px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .status .readout .dim { color: var(--text-2); }
+  #counter { white-space: pre; }
+
+  .beats {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+  @media (min-width: 600px) {
+    .beats { gap: 14px; }
+  }
+  .beat {
+    --c: #2EE86F; --hi: #C9FFDA; --edge: #0F9A42; --halo: rgb(46 232 111 / .32);
+    --dim: #0A2112; --dim-hi: #12361F;
+    flex: 0 1 58px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .beat[data-level="1"] {
+    --c: #FFB020; --hi: #FFEBB5; --edge: #B87404; --halo: rgb(255 176 32 / .34);
+    --dim: #261A04; --dim-hi: #3B2A08;
+  }
+  .beat[data-level="2"] {
+    --c: #FF3B2F; --hi: #FFD0CB; --edge: #A8150C; --halo: rgb(255 59 47 / .38);
+    --dim: #2A0806; --dim-hi: #44110C;
+  }
+  .beat.group-start { margin-left: 6px; }
+  @media (min-width: 600px) {
+    .beat.group-start { margin-left: 12px; }
+  }
+  .led {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 38%, var(--dim-hi), var(--dim) 72%);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / .06),
+      inset 0 -4px 8px rgb(0 0 0 / .55),
+      0 0 0 3px #050505,
+      0 0 0 4px #1E2125;
+  }
+  .glow {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    opacity: 0;
+    background: radial-gradient(circle at 46% 38%, #fff 0 10%, var(--hi) 24%, var(--c) 58%, var(--edge) 100%);
+    box-shadow: 0 0 14px 2px var(--c), 0 0 40px 10px var(--halo);
+    transition: opacity .16s ease-out;
+  }
+  .beat.on .glow { opacity: .34; }
+  .num {
+    font-family: var(--led-font);
+    font-weight: 800;
+    font-size: 14px;
+    line-height: 1;
+    color: #4A4F56;
+    transition: color .12s;
+  }
+  .beat.on .num { color: var(--c); text-shadow: 0 0 8px var(--halo); }
+
+  .sweep {
+    display: flex;
+    gap: 3px;
+  }
+  @media (min-width: 600px) {
+    .sweep { gap: 5px; }
+  }
+  .seg {
+    position: relative;
+    flex: 1 1 0;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--amber-dim);
+  }
+  .seg i {
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: #FFC24D;
+    box-shadow: 0 0 10px 1px rgb(255 176 32 / .75);
+    opacity: 0;
+  }
+
+  /* ---------- Käynnistys ---------- */
+  .transport {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px 28px;
+    margin-block: 18px 22px;
+  }
+  .btn-start {
+    flex: 1 1 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 58px;
+    border: 1.5px solid var(--amber);
+    border-radius: 14px;
+    background: var(--amber);
+    color: #0A0A0B;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color .15s, color .15s, border-color .15s, box-shadow .15s, transform .08s;
+  }
+  @media (min-width: 600px) {
+    .btn-start { flex: 0 0 260px; }
+  }
+  .btn-start:hover { box-shadow: 0 0 22px var(--amber-halo); }
+  .btn-start:active { transform: scale(.98); }
+  .btn-start.running {
+    background: #140404;
+    border-color: var(--red);
+    color: #FF6A60;
+    box-shadow: 0 0 20px rgb(255 59 47 / .25), inset 0 0 14px rgb(255 59 47 / .12);
+  }
+  .btn-start svg { width: 18px; height: 18px; fill: currentColor; }
+
+  .hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  kbd {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 1px 6px;
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--field);
+    color: var(--text);
+    font: 500 12px/1.4 "Barlow", system-ui, sans-serif;
+    text-align: center;
+  }
+  @media (hover: none) {
+    .hint { display: none; }
+  }
+
+  /* ---------- Säätimet ---------- */
+  .panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--panel);
+  }
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+  .side > section + section {
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+  @media (min-width: 600px) {
+    .panel { padding: 26px; }
+  }
+  @media (min-width: 780px) {
+    .panel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; }
+    .side { padding-top: 0; border-top: 0; padding-left: 32px; border-left: 1px solid var(--line); }
+  }
+
+  .label {
+    display: block;
+    margin: 0 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--text-2);
+  }
+
+  .bpm-row {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
+    align-items: center;
+    gap: 12px;
+  }
+  .step {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--field);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    transition: border-color .12s, color .12s, transform .08s;
+  }
+  .step:hover { border-color: var(--amber); color: var(--amber); }
+  .step:active { transform: scale(.94); }
+
+  .bpm-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background:
+      radial-gradient(circle, rgb(255 176 32 / .07) 0.9px, transparent 1.3px) 0 0 / 7px 7px,
+      #000;
+    cursor: text;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  .bpm-field:hover { border-color: var(--line-strong); }
+  .bpm-field:focus-within { border-color: var(--amber); box-shadow: 0 0 0 3px rgb(255 176 32 / .18); }
+  .bpm-field.invalid { border-color: var(--danger); }
+  .bpm-field input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    text-align: center;
+    font-family: var(--led-font);
+    font-weight: 900;
+    font-size: clamp(72px, 21vw, 100px);
+    line-height: 1;
+    color: var(--amber);
+    caret-color: var(--amber);
+    text-shadow: 0 0 2px rgb(255 176 32 / .8), 0 0 18px var(--amber-halo);
+    font-variant-numeric: tabular-nums;
+  }
+  .bpm-unit {
+    font-family: var(--led-font);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: .2em;
+    color: #8A6414;
+  }
+  .help {
+    margin: 8px 0 0;
+    min-height: 1.45em;
+    font-size: 13px;
+    color: var(--text-2);
+    text-align: center;
+  }
+  .help.error { color: var(--danger); }
+
+  .slider { margin-top: 14px; }
+  .slider-ends {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 30px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+    --pct: 50%;
+  }
+  input[type="range"]:focus-visible { outline: none; }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right, var(--amber) var(--pct), var(--line) var(--pct));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    margin-top: -9px;
+    border-radius: 50%;
+    background: #000;
+    border: 2px solid var(--amber);
+    box-shadow: 0 0 10px var(--amber-halo);
+  }
+  input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 5px rgb(255 176 32 / .25), 0 0 10px var(--amber-halo);
+  }
+  input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+  input[type="range"]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--amber); }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #000;
+    border: 2px solid var(--amber);
+    box-shadow: 0 0 10px var(--amber-halo);
+  }
+  input[type="range"]:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 5px rgb(255 176 32 / .25), 0 0 10px var(--amber-halo);
+  }
+
+  .btn-tap {
+    width: 100%;
+    height: 46px;
+    margin-top: 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    background: var(--field);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color .1s, border-color .12s, color .12s;
+  }
+  .btn-tap:hover { border-color: var(--amber); }
+  .btn-tap.flash { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+
+  .meters {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .meter {
+    display: grid;
+    place-items: center;
+    height: 62px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--field);
+    color: #B9BDC2;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background-color .12s, border-color .12s, color .12s, box-shadow .12s;
+  }
+  .meter:hover { border-color: var(--line-strong); color: var(--text); }
+  input:checked + .meter {
+    background: var(--amber-dim);
+    border-color: var(--amber);
+    color: var(--amber);
+    box-shadow: 0 0 16px rgb(255 176 32 / .16), inset 0 0 12px rgb(255 176 32 / .08);
+  }
+  input:checked + .meter .frac { text-shadow: 0 0 10px var(--amber-halo); }
+  input:focus-visible + .meter { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .frac {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: var(--led-font);
+    font-weight: 900;
+    font-size: 22px;
+    line-height: .92;
+  }
+  .meter-note {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+
+  .volume-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 3.4em;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-2);
+  }
+  .volume-row output {
+    text-align: right;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; }
+  }
+</style>
+
+<div class="app">
+  <header class="top">
+    <h1 class="brand">Beat Meter</h1>
+    <span class="kicker">Metronome</span>
+  </header>
+
+  <section class="display" aria-label="Display">
+    <div class="status">
+      <p class="marking" aria-live="polite"><span id="mark-it">Allegro</span><small id="mark-fi">fast and lively</small></p>
+      <p class="readout"><span id="meter-readout">4/4</span><span id="counter" class="dim">Ready</span></p>
+    </div>
+    <div class="beats" id="beats" aria-hidden="true"></div>
+    <div class="sweep" id="sweep" aria-hidden="true"></div>
+  </section>
+
+  <div class="transport">
+    <button class="btn-start" id="toggle" type="button" aria-pressed="false">
+      <svg id="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>
+      <svg id="icon-stop" viewBox="0 0 24 24" aria-hidden="true" hidden><rect x="5.5" y="5.5" width="13" height="13" rx="2"/></svg>
+      <span id="toggle-text">Start</span>
+    </button>
+    <p class="hint">
+      <span><kbd>Space</kbd> start / stop</span>
+      <span><kbd>↑</kbd> <kbd>↓</kbd> tempo ±1, <kbd>Shift</kbd> ±10</span>
+      <span><kbd>T</kbd> tap tempo</span>
+    </p>
+  </div>
+
+  <main class="panel">
+    <section aria-labelledby="tempo-label">
+      <h2 class="label" id="tempo-label">Tempo</h2>
+      <div class="bpm-row">
+        <button class="step" id="bpm-down" type="button" aria-label="Slow down by one">−</button>
+        <label class="bpm-field" id="bpm-field" for="bpm-input">
+          <input id="bpm-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
+                 value="120" autocomplete="off" spellcheck="false"
+                 aria-label="Tempo, beats per minute" aria-describedby="bpm-help">
+          <span class="bpm-unit" aria-hidden="true">BPM</span>
+        </label>
+        <button class="step" id="bpm-up" type="button" aria-label="Speed up by one">+</button>
+      </div>
+      <p class="help" id="bpm-help">Type a tempo or drag the slider (20–300).</p>
+
+      <div class="slider">
+        <input type="range" id="bpm-slider" min="20" max="300" step="1" value="120" aria-label="Tempo">
+        <div class="slider-ends" aria-hidden="true"><span>20</span><span>300</span></div>
+      </div>
+
+      <button class="btn-tap" id="tap" type="button">Tap tempo</button>
+    </section>
+
+    <div class="side">
+      <section aria-labelledby="meter-label">
+        <h2 class="label" id="meter-label">Time signature</h2>
+        <div class="meters" id="meters" role="radiogroup" aria-labelledby="meter-label"></div>
+        <p class="meter-note" id="meter-note"></p>
+      </section>
+
+      <section>
+        <label class="label" for="volume">Volume</label>
+        <div class="volume-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+          <input type="range" id="volume" min="0" max="100" step="1" value="70">
+          <output id="volume-out" for="volume">70%</output>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  document.documentElement.lang = 'en';
+
+  const MIN = 20, MAX = 300;
+  const SEGMENTS = 21;         // pyyhkäisypalkin ledien määrä
+  const STORE = 'tahtimittari';
+
+  // Painotukset: 2 = tahdin alku (punainen), 1 = ryhmän alku (keltainen), 0 = tavallinen isku (vihreä)
+  const METERS = [
+    { id: '2-4',  n: 2,  d: 4, accents: [2,0] },
+    { id: '3-4',  n: 3,  d: 4, accents: [2,0,0] },
+    { id: '4-4',  n: 4,  d: 4, accents: [2,0,0,0] },
+    { id: '5-4',  n: 5,  d: 4, accents: [2,0,0,1,0], group: '3+2' },
+    { id: '2-2',  n: 2,  d: 2, accents: [2,0] },
+    { id: '3-8',  n: 3,  d: 8, accents: [2,0,0] },
+    { id: '6-8',  n: 6,  d: 8, accents: [2,0,0,1,0,0], group: '3+3' },
+    { id: '7-8',  n: 7,  d: 8, accents: [2,0,1,0,1,0,0], group: '2+2+3' },
+    { id: '9-8',  n: 9,  d: 8, accents: [2,0,0,1,0,0,1,0,0], group: '3+3+3' },
+    { id: '12-8', n: 12, d: 8, accents: [2,0,0,1,0,0,1,0,0,1,0,0], group: '3+3+3+3' },
+  ];
+  const NOTE = { 2: 'half note', 4: 'quarter note', 8: 'eighth note' };
+  const MARKINGS = [
+    [40, 'Grave', 'very slowly'],
+    [60, 'Largo', 'broadly'],
+    [66, 'Larghetto', 'fairly broadly'],
+    [76, 'Adagio', 'slowly'],
+    [108, 'Andante', 'at a walking pace'],
+    [120, 'Moderato', 'moderately'],
+    [168, 'Allegro', 'fast and lively'],
+    [200, 'Presto', 'very fast'],
+    [Infinity, 'Prestissimo', 'extremely fast'],
+  ];
+  const HELP = 'Type a tempo or drag the slider (20–300).';
+
+  const $ = (s) => document.querySelector(s);
+  const el = {
+    input: $('#bpm-input'), field: $('#bpm-field'), help: $('#bpm-help'),
+    slider: $('#bpm-slider'), down: $('#bpm-down'), up: $('#bpm-up'), tap: $('#tap'),
+    markIt: $('#mark-it'), markFi: $('#mark-fi'),
+    meterReadout: $('#meter-readout'), counter: $('#counter'),
+    meters: $('#meters'), meterNote: $('#meter-note'),
+    volume: $('#volume'), volumeOut: $('#volume-out'),
+    beats: $('#beats'), sweep: $('#sweep'),
+    toggle: $('#toggle'), toggleText: $('#toggle-text'), iconPlay: $('#icon-play'), iconStop: $('#icon-stop'),
+  };
+
+  const state = { bpm: 120, meter: METERS[2], volume: 70, running: false };
+  const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const clamp = (v) => Math.round(Math.min(MAX, Math.max(MIN, v)));
+  const markingFor = (b) => MARKINGS.find((m) => b < m[0]);
+
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({ bpm: state.bpm, meter: state.meter.id, volume: state.volume }));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE) || '{}');
+      if (Number.isFinite(s.bpm)) state.bpm = clamp(s.bpm);
+      const m = METERS.find((x) => x.id === s.meter);
+      if (m) state.meter = m;
+      if (Number.isFinite(s.volume)) state.volume = Math.min(100, Math.max(0, s.volume));
+    } catch (e) {}
+  }
+
+  // ---------- Tempo ----------
+  function setHelp(text, isError) {
+    el.help.textContent = text || HELP;
+    el.help.classList.toggle('error', !!isError);
+    el.field.classList.toggle('invalid', !!isError);
+  }
+
+  function setBpm(v, fromInput) {
+    const b = clamp(v);
+    state.bpm = b;
+    if (!fromInput) el.input.value = b;
+    el.slider.value = b;
+    el.slider.style.setProperty('--pct', ((b - MIN) / (MAX - MIN) * 100) + '%');
+    const [, it, fi] = markingFor(b);
+    if (el.markIt.textContent !== it) {
+      el.markIt.textContent = it;
+      el.markFi.textContent = fi;
+    }
+    setHelp();
+    save();
+  }
+
+  el.input.addEventListener('input', () => {
+    const digits = el.input.value.replace(/\D/g, '').slice(0, 3);
+    if (digits !== el.input.value) el.input.value = digits;
+    const n = parseInt(digits, 10);
+    if (n >= MIN && n <= MAX) setBpm(n, true);
+    else if (n > MAX) setHelp(`The maximum tempo is ${MAX} BPM.`, true);
+    else setHelp();   // kesken kirjoittamisen, esim. "1" matkalla lukuun 140
+  });
+  function commitInput() {
+    const n = parseInt(el.input.value, 10);
+    if (Number.isNaN(n)) { setBpm(state.bpm); return; }
+    setBpm(n);
+    if (clamp(n) !== n) setHelp(`Tempo was clamped to ${MIN}–${MAX}.`);
+  }
+  el.input.addEventListener('change', commitInput);
+  el.input.addEventListener('focus', () => requestAnimationFrame(() => el.input.select()));
+  el.input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      commitInput();
+      el.input.select();
+    } else if (e.key === 'Escape') {
+      setBpm(state.bpm);
+      el.input.blur();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setBpm(state.bpm + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
+    }
+  });
+
+  el.slider.addEventListener('input', () => setBpm(+el.slider.value));
+
+  function stepper(btn, delta) {
+    let wait, repeat;
+    const halt = () => { clearTimeout(wait); clearInterval(repeat); };
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      setBpm(state.bpm + delta);
+      wait = setTimeout(() => { repeat = setInterval(() => setBpm(state.bpm + delta), 70); }, 420);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((t) => btn.addEventListener(t, halt));
+    btn.addEventListener('click', (e) => { if (e.detail === 0) setBpm(state.bpm + delta); }); // näppäimistö
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  stepper(el.down, -1);
+  stepper(el.up, 1);
+
+  // Napautustempo: keskiarvo enintään kuudesta viimeisestä napautuksesta
+  let taps = [], tapReset, tapFlash;
+  function tapTempo() {
+    const now = performance.now();
+    if (taps.length && now - taps[taps.length - 1] > 2000) taps = [];
+    taps.push(now);
+    if (taps.length > 6) taps.shift();
+    if (taps.length >= 2) {
+      const avg = (taps[taps.length - 1] - taps[0]) / (taps.length - 1);
+      setBpm(60000 / avg);
+      el.tap.textContent = `Tapped: ${state.bpm} BPM`;
+    } else {
+      el.tap.textContent = 'Keep tapping in time…';
+    }
+    el.tap.classList.add('flash');
+    clearTimeout(tapFlash);
+    tapFlash = setTimeout(() => el.tap.classList.remove('flash'), 90);
+    clearTimeout(tapReset);
+    tapReset = setTimeout(() => { taps = []; el.tap.textContent = 'Tap tempo'; }, 2000);
+  }
+  el.tap.addEventListener('pointerdown', (e) => { if (e.button === 0) tapTempo(); });
+  el.tap.addEventListener('click', (e) => { if (e.detail === 0) tapTempo(); });
+
+  // ---------- Tahtilaji ----------
+  el.meters.innerHTML = METERS.map((m) => `
+    <input class="sr-only" type="radio" name="meter" id="meter-${m.id}" value="${m.id}">
+    <label class="meter" for="meter-${m.id}">
+      <span class="frac" aria-hidden="true"><span>${m.n}</span><span>${m.d}</span></span>
+      <span class="sr-only">${m.n}/${m.d}</span>
+    </label>`).join('');
+  el.meters.addEventListener('change', (e) => setMeter(e.target.value));
+
+  function setMeter(id) {
+    const m = METERS.find((x) => x.id === id) || METERS[2];
+    state.meter = m;
+    document.getElementById('meter-' + m.id).checked = true;
+    el.beats.innerHTML = m.accents.map((a, i) => `
+      <div class="beat${a && i ? ' group-start' : ''}" data-level="${a}">
+        <div class="led"><i class="glow"></i></div>
+        <span class="num">${i + 1}</span>
+      </div>`).join('');
+    el.meterReadout.textContent = `${m.n}/${m.d}`;
+    el.meterNote.textContent =
+      (m.group ? `Grouping ${m.group}` : 'Accent on the downbeat') + ` · one beat = ${NOTE[m.d]}`;
+    if (state.running && sched.beat !== 0) { sched.beat = 0; sched.bar++; }
+    save();
+  }
+
+  // ---------- Äänenvoimakkuus ----------
+  function setVolume(v) {
+    state.volume = v;
+    el.volume.value = v;
+    el.volume.style.setProperty('--pct', v + '%');
+    el.volumeOut.textContent = v + '%';
+    if (master) master.gain.setTargetAtTime((v / 100) ** 2, ctx.currentTime, 0.015);
+    save();
+  }
+  el.volume.addEventListener('input', () => setVolume(+el.volume.value));
+
+  // ---------- Ääni ja ajastus ----------
+  // Iskut ajastetaan Web Audion kelloon hieman etukäteen, jotta rytmi pysyy tasaisena.
+  let ctx = null, master = null, run = null;
+  const sched = { next: 0, beat: 0, bar: 1, tick: 0, timer: null };
+  const queue = [];
+  const VOICES = { 2: { f: 1568, g: 1 }, 1: { f: 1175, g: .8 }, 0: { f: 880, g: .6 } };
+
+  function audio() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC({ latencyHint: 'interactive' });
+      master = ctx.createGain();
+      master.gain.value = (state.volume / 100) ** 2;
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  function click(t, level) {
+    const v = VOICES[level];
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(v.f, t);
+    o.frequency.exponentialRampToValueAtTime(v.f * .82, t + .05);
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(v.g, t + .002);
+    g.gain.exponentialRampToValueAtTime(.0001, t + .055);
+    o.connect(g);
+    g.connect(run);
+    o.start(t);
+    o.stop(t + .06);
+  }
+
+  function schedule() {
+    const ahead = document.hidden ? 1.5 : 0.12;   // taustavälilehdellä ajastin hidastuu
+    if (sched.next < ctx.currentTime - 0.2) sched.next = ctx.currentTime + 0.05;
+    while (sched.next < ctx.currentTime + ahead) {
+      const m = state.meter;
+      const i = sched.beat % m.n;
+      click(sched.next, m.accents[i]);
+      queue.push({ t: sched.next, beat: i, bar: sched.bar, tick: sched.tick });
+      sched.next += 60 / state.bpm;
+      sched.tick++;
+      sched.beat = i + 1;
+      if (sched.beat >= m.n) { sched.beat = 0; sched.bar++; }
+    }
+  }
+
+  function start() {
+    audio();
+    run = ctx.createGain();
+    run.connect(master);
+    Object.assign(sched, { beat: 0, bar: 1, tick: 0, next: ctx.currentTime + 0.08 });
+    queue.length = 0;
+    last = null;
+    state.running = true;
+    schedule();
+    sched.timer = setInterval(schedule, 25);
+    renderToggle();
+    loop();
+  }
+
+  function stop() {
+    state.running = false;
+    clearInterval(sched.timer);
+    if (run) {
+      const r = run;
+      r.gain.setTargetAtTime(0, ctx.currentTime, 0.004);   // vaimenna jo ajastetut iskut
+      setTimeout(() => r.disconnect(), 250);
+      run = null;
+    }
+    queue.length = 0;
+    last = null;
+    for (const b of el.beats.children) b.classList.remove('on');
+    el.counter.textContent = 'Ready';
+    el.counter.classList.add('dim');
+    renderToggle();
+    loop();
+  }
+
+  const toggleRun = () => (state.running ? stop() : start());
+  el.toggle.addEventListener('click', toggleRun);
+
+  // ---------- LED-näyttö ----------
+  el.sweep.innerHTML = '<div class="seg"><i></i></div>'.repeat(SEGMENTS);
+  const segs = [...el.sweep.querySelectorAll('i')];
+  const levels = new Float32Array(SEGMENTS);
+  let last = null, raf = null, prevFrame = 0;
+
+  function onBeat(b) {
+    const beats = el.beats.children;
+    for (let i = 0; i < beats.length; i++) beats[i].classList.toggle('on', i === b.beat);
+    const glow = beats[b.beat] && beats[b.beat].querySelector('.glow');
+    if (glow && glow.animate) {
+      glow.getAnimations().forEach((a) => a.cancel());
+      glow.animate([{ opacity: 1 }, { opacity: .34 }], {
+        duration: Math.min(280, 60000 / state.bpm * .8),
+        easing: 'cubic-bezier(.2, .7, .3, 1)',
+      });
+    }
+    el.counter.classList.remove('dim');
+    el.counter.textContent = `Bar ${b.bar}  Beat ${b.beat + 1}`;
+  }
+
+  function frame(ts) {
+    raf = null;
+    const dt = prevFrame ? Math.min(0.1, (ts - prevFrame) / 1000) : 1 / 60;
+    prevFrame = ts;
+
+    let pos = -10;   // valopisteen paikka palkissa, -10 = ei näkyvissä
+    if (state.running && ctx) {
+      const now = ctx.currentTime - (ctx.outputLatency || 0);
+      while (queue.length && queue[0].t <= now) { last = queue.shift(); onBeat(last); }
+      if (last && !motionQuery.matches) {
+        // Valo on palkin päässä jokaisen iskun hetkellä ja hidastaa päihin kuin heiluri.
+        const nextT = queue.length ? queue[0].t : sched.next;
+        const p = Math.min(1, Math.max(0, (now - last.t) / (nextT - last.t)));
+        const side = last.tick % 2 ? 1 : -1;
+        pos = (side * Math.cos(Math.PI * p) + 1) / 2 * (SEGMENTS - 1);
+      }
+    }
+
+    const decay = Math.exp(-dt / 0.09);   // jälkihehku
+    let lit = false;
+    for (let i = 0; i < SEGMENTS; i++) {
+      const direct = Math.max(0, 1 - Math.abs(i - pos) / 0.85);
+      let v = Math.max(direct, levels[i] * decay);
+      if (v < 0.01) v = 0;
+      if (v !== levels[i]) {
+        levels[i] = v;
+        segs[i].style.opacity = v.toFixed(3);
+      }
+      if (v) lit = true;
+    }
+
+    if (state.running || lit) loop();
+    else prevFrame = 0;
+  }
+  function loop() { if (!raf) raf = requestAnimationFrame(frame); }
+
+  function renderToggle() {
+    el.toggle.setAttribute('aria-pressed', String(state.running));
+    el.toggle.classList.toggle('running', state.running);
+    el.toggleText.textContent = state.running ? 'Stop' : 'Start';
+    el.iconPlay.toggleAttribute('hidden', state.running);
+    el.iconStop.toggleAttribute('hidden', !state.running);
+  }
+
+  // ---------- Pikanäppäimet ----------
+  document.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    const inText = t === el.input;
+    if (e.key === ' ') {
+      if (inText || t.tagName === 'BUTTON') return;   // painike reagoi itse välilyöntiin
+      e.preventDefault();
+      if (!e.repeat) toggleRun();
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && t.tagName !== 'INPUT') {
+      e.preventDefault();
+      setBpm(state.bpm + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
+    } else if ((e.key === 't' || e.key === 'T') && !inText && !e.repeat) {
+      tapTempo();
+    }
+  });
+
+  // ---------- Käynnistys ----------
+  load();
+  setMeter(state.meter.id);
+  setBpm(state.bpm);
+  setVolume(state.volume);
+  renderToggle();
+})();
+</script>
