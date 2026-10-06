@@ -199,15 +199,21 @@ const PIECES = [
 const WEIGHT_BY_SIZE = { 1: 3, 2: 3.5, 3: 2.6, 4: 1.1 };
 const WEIGHT_SHIFT   = { 1: -0.5, 2: -0.3, 3: 0.2, 4: 0.25 };   // muutos per taso tason 1 jälkeen
 const WEIGHT_LIMITS  = { 1: [1, 3], 2: [2, 3.5], 3: [2.6, 3.4], 4: [1.1, 2.1] };
+// Tasosta 6 lähtien lisäsiirto kohti isoja paloja (per taso tason 5 jälkeen) ja sen rajat
+const BIG_FROM_LEVEL = 6;
+const BIG_SHIFT      = { 1: -0.25, 2: -0.4, 3: -0.2, 4: 0.35 };
+const BIG_LIMITS     = { 1: [0.5, 3], 2: [1, 3.5], 3: [2, 3.4], 4: [1.1, 4] };
 
 // Tasot: pisteraja, jolla taso alkaa (taso 1 = indeksi 0)
 const LEVEL_THRESHOLDS = [0, 300, 800, 1500, 2500, 4000, 6000, 8500, 11500];
 const CCW_FROM_LEVEL = 3;        // tästä tasosta lähtien rengas voi pyörähtää vastapäivään
 const ASTEROID_FROM_LEVEL = 4;   // tästä tasosta lähtien asteroideja
+const SHOWER_FROM_LEVEL = 6;     // tästä tasosta lähtien osa iskuista on usean asteroidin parvia
 const LEVEL_INFO = {
   2: 'Bigger pieces incoming',
   3: 'Rings may now rotate counter-clockwise!',
   4: 'Asteroids incoming!',
+  6: 'Asteroid showers & bigger pieces!',
 };
 const ROCK = 100;                // asteroidisolun arvo ruudukossa
 const ROCK_HEX = '#8d93a8';
@@ -400,7 +406,11 @@ const Logic = {
     const shift = Math.max(0, level - 1);
     const [lo, hi] = WEIGHT_LIMITS[size] || [1, 1];
     const w = (WEIGHT_BY_SIZE[size] || 1) + (WEIGHT_SHIFT[size] || 0) * shift;
-    return Math.min(hi, Math.max(lo, w));
+    const base = Math.min(hi, Math.max(lo, w));
+    const big = Math.max(0, level - (BIG_FROM_LEVEL - 1));
+    if (!big) return base;
+    const [blo, bhi] = BIG_LIMITS[size] || [lo, hi];
+    return Math.min(bhi, Math.max(blo, base + (BIG_SHIFT[size] || 0) * big));
   },
 
   randomPiece(rng = Math.random, level = 1) {
@@ -437,7 +447,20 @@ const Logic = {
     return rng() < pCCW ? -1 : 1;
   },
 
-  asteroidInterval(level) { return Math.max(3, 7 - (level - ASTEROID_FROM_LEVEL)); },
+  // Vuoroja iskujen välillä: 4→7, 5→6, sitten nopeammin 6→4, 7+→3
+  asteroidInterval(level) {
+    if (level < SHOWER_FROM_LEVEL) return 7 - (level - ASTEROID_FROM_LEVEL);
+    return Math.max(3, 4 - (level - SHOWER_FROM_LEVEL));
+  },
+
+  // Asteroidien määrä iskussa numero `wave` (0, 1, 2, ...).
+  // Tasosta 6: joka 3. isku tuplana, tasosta 7: joka 2., tasosta 10: aina 2 ja joka 2. kolme.
+  asteroidCount(level, wave) {
+    if (level < SHOWER_FROM_LEVEL) return 1;
+    const base = level >= 10 ? 2 : 1;
+    const cycle = Math.max(2, 9 - level);
+    return base + (wave % cycle === cycle - 1 ? 1 : 0);
+  },
 
   // Satunnainen tyhjä solu; vältetään soluja, jotka täyttäisivät linjan (ei ilmaisia tyhjennyksiä)
   pickAsteroidCell(grid, rng = Math.random) {
@@ -458,7 +481,7 @@ const Logic = {
       grid: Logic.emptyGrid(), tray: Logic.newTray(Math.random, 1), score: 0, best,
       comboLevel: 0, spins: START_SPINS, activeRing: 0, turn: 0,
       gameOver: false, hint: false,
-      level: 1, nextDir: 1, asteroidIn: null,
+      level: 1, nextDir: 1, asteroidIn: null, asteroidWave: 0,
     };
   },
 };
@@ -986,9 +1009,11 @@ function updateHUD() {
   let html = `Next to rotate: <b>ring ${state.activeRing + 1}</b> ${dirTxt}` +
              ` <span style="opacity:.6">(1 = innermost)</span>`;
   if (state.asteroidIn !== null) {
+    const n = Logic.asteroidCount(state.level, state.asteroidWave);
+    const icon = '☄'.repeat(n);
     html += state.asteroidIn <= 1
-      ? ` · <span class="ccw">☄ asteroid after this turn!</span>`
-      : ` · ☄ in ${state.asteroidIn} turns`;
+      ? ` · <span class="ccw">${icon} ${n > 1 ? n + ' asteroids' : 'asteroid'} after this turn!</span>`
+      : ` · ${icon} in ${state.asteroidIn} turns`;
   }
   if (view.infoFlash && performance.now() < view.infoFlash.until) html = view.infoFlash.html;
   else if (state.hint) html = `<span class="hint">No piece fits – use a spin: tap a ring!</span>`;
@@ -1157,7 +1182,12 @@ async function advanceHazards() {
   if (state.asteroidIn === null) { state.asteroidIn = Logic.asteroidInterval(state.level); return; }
   state.asteroidIn--;
   if (state.asteroidIn > 0) return;
-  await dropAsteroid();
+  const n = Logic.asteroidCount(state.level, state.asteroidWave);
+  for (let i = 0; i < n; i++) {
+    if (i > 0) await wait(120);
+    await dropAsteroid();
+  }
+  state.asteroidWave++;
   state.asteroidIn = Logic.asteroidInterval(state.level);
 }
 
